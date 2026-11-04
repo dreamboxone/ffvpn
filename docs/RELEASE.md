@@ -20,3 +20,5 @@ Built with GitHub Actions. OpenWrt targets: 23.05 / 24.10 / 25.12. The installer
 
 Build: https://github.com/dreamboxone/ffvpn/actions/runs/41903329762
 
+
+Integrated IPK packages for OpenWrt 23.05/24.10 and APK packages for 25.12 are included for all supported architectures, with detached usign signatures. See README for installation.

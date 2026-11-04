@@ -58,3 +58,7 @@ wget -qO /tmp/ffvpn-install.sh https://raw.githubusercontent.com/dreamboxone/ffv
 Интерфейс и инструменты: AGPL-3.0-or-later. Исходное ядро сохраняет GPL-3.0. Тема и настройка часов взяты из [Zirgozar](https://github.com/dreamboxone/zirgozar). Лицензия Vazirmatn приложена к шрифту. Версии источников указаны в [UPSTREAM.json](UPSTREAM.json).
 
 ffvpn · Copyright © 2026 dreamboxone · GNU AGPLv3 · Без гарантий
+
+## Пакеты OpenWrt
+
+В [релизе](https://github.com/dreamboxone/ffvpn/releases/latest) для каждой архитектуры есть единый пакет приложения и LuCI: `ipk` для 23.05/24.10, `apk` для 25.12. Архитектура должна совпадать с роутером. Установка: `opkg install /tmp/ffvpn_1.0.0-1_ARCH.ipk` или после проверки подписи `apk add --allow-untrusted /tmp/ffvpn-1.0.0-r1-ARCH.apk`. Сторонние APK не подписаны официальным репозиторием OpenWrt; приложены отдельные подписи usign `.sig` и SHA256SUMS. Однострочный установщик проверяет подписи автоматически. Удаление: `opkg remove ffvpn` или `apk del ffvpn`.

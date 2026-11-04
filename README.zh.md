@@ -58,3 +58,7 @@ wget -qO /tmp/ffvpn-install.sh https://raw.githubusercontent.com/dreamboxone/ffv
 界面和工具使用 AGPL-3.0-or-later，上游核心保留 GPL-3.0。主题与时间设置来自 [Zirgozar](https://github.com/dreamboxone/zirgozar)。Vazirmatn 字体附带许可证。参见 [UPSTREAM.json](UPSTREAM.json)。
 
 ffvpn · Copyright © 2026 dreamboxone · GNU AGPLv3 · 不提供担保
+
+## OpenWrt 软件包
+
+[发行版](https://github.com/dreamboxone/ffvpn/releases/latest)为各架构提供集成 LuCI 的单个包：23.05/24.10 使用 `ipk`，25.12 使用 `apk`。架构必须匹配路由器。安装：`opkg install /tmp/ffvpn_1.0.0-1_ARCH.ipk`；验证签名后使用 `apk add --allow-untrusted /tmp/ffvpn-1.0.0-r1-ARCH.apk`。第三方 APK 不使用 OpenWrt 官方仓库签名，提供独立 usign `.sig` 和 SHA256SUMS。一行安装程序自动验证签名。卸载：`opkg remove ffvpn` 或 `apk del ffvpn`。

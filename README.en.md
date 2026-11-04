@@ -58,3 +58,7 @@ Not affiliated with or endorsed by Mozilla. Account quotas and availability are 
 The interface and ffvpn utilities use AGPL-3.0-or-later. The upstream core retains its GPL-3.0 license. Theme and clock behavior derive from [Zirgozar](https://github.com/dreamboxone/zirgozar). Vazirmatn includes its font license. See [UPSTREAM.json](UPSTREAM.json) for pinned revisions.
 
 ffvpn · Copyright © 2026 dreamboxone · GNU AGPLv3 · No warranty
+
+## OpenWrt packages
+
+Each architecture has one integrated application and LuCI package in [Releases](https://github.com/dreamboxone/ffvpn/releases/latest): `ipk` for 23.05/24.10 and `apk` for 25.12. Match the router architecture. Install with `opkg install /tmp/ffvpn_1.0.0-1_ARCH.ipk` or, after verifying its detached signature, `apk add --allow-untrusted /tmp/ffvpn-1.0.0-r1-ARCH.apk`. APK files are third-party packages, not signed by the official OpenWrt repository; detached usign `.sig` files and SHA256SUMS are provided. The one-line installer verifies signatures automatically. Remove with `opkg remove ffvpn` or `apk del ffvpn`.

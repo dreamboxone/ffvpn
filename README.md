@@ -72,4 +72,16 @@ wget -qO /tmp/ffvpn-install.sh https://raw.githubusercontent.com/dreamboxone/ffv
 
 ffvpn · Copyright © 2026 dreamboxone · GNU AGPLv3 · بدون ضمانت
 
+
+## بسته های OpenWrt
+
+در [ریلیز](https://github.com/dreamboxone/ffvpn/releases/latest)، برای هر معماری یک بسته یکپارچه برنامه و LuCI وجود دارد: `ipk` برای OpenWrt 23.05 و 24.10 و `apk` برای OpenWrt 25.12. نام معماری فایل باید با معماری روتر یکسان باشد.
+
+```sh
+opkg install /tmp/ffvpn_1.0.0-1_ARCH.ipk
+# OpenWrt 25.12؛ پس از بررسی امضای فایل دانلود شده:
+apk add --allow-untrusted /tmp/ffvpn-1.0.0-r1-ARCH.apk
+```
+
+بسته های شخص ثالث APK امضای مخزن رسمی OpenWrt را ندارند؛ فایل امضای جداگانه usign با پسوند `.sig` و `SHA256SUMS` همراه آن ها منتشر می شود. نصب کننده یک خطی امضا را خودکار بررسی می کند. برای حذف بسته: `opkg remove ffvpn` یا `apk del ffvpn`.
 </div>

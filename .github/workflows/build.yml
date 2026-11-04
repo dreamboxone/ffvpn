@@ -106,6 +106,15 @@ jobs:
           git -C "$RUNNER_TEMP/usign" checkout c4c72b1b07945ee192361dc751291a7c98d6adcd
           cmake -S "$RUNNER_TEMP/usign" -B "$RUNNER_TEMP/usign/build"
           cmake --build "$RUNNER_TEMP/usign/build" --parallel 2
+      - name: Prepare official OpenWrt APK tool
+        run: |
+          set -eu
+          sdk=openwrt-sdk-25.12.0-x86-64_gcc-14.3.0_musl.Linux-x86_64.tar.zst
+          curl --fail --location --retry 5 "https://downloads.openwrt.org/releases/25.12.0/targets/x86/64/$sdk" -o "$RUNNER_TEMP/sdk.tar.zst"
+          echo "9f371906ce6d2f95418f69fac06df58bf9df0ffc4abed6206c30f1b547fcfc12  $RUNNER_TEMP/sdk.tar.zst" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/openwrt-sdk"
+          tar --zstd -xf "$RUNNER_TEMP/sdk.tar.zst" -C "$RUNNER_TEMP/openwrt-sdk" --strip-components=1
+          "$RUNNER_TEMP/openwrt-sdk/staging_dir/host/bin/apk" --version
       - name: Verify and sign release assets
         env:
           SIGNING_KEY_B64: ${{ secrets.FFVPN_RELEASE_SIGNING_KEY_B64 }}
@@ -117,7 +126,7 @@ jobs:
           key="$RUNNER_TEMP/ffvpn-release.key"
           trap 'rm -f "$key"' EXIT
           printf '%s' "$SIGNING_KEY_B64" | base64 --decode > "$key"
-          python3 build/publish.py --assets dist/release --usign "$RUNNER_TEMP/usign/build/usign" --key "$key"
+          python3 build/publish.py --assets dist/release --usign "$RUNNER_TEMP/usign/build/usign" --key "$key" --apk "$RUNNER_TEMP/openwrt-sdk/staging_dir/host/bin/apk"
       - name: Publish release on GitHub
         env:
           GH_TOKEN: ${{ github.token }}
@@ -125,14 +134,4 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tag="v$(cat VERSION)"
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            test "${GITHUB_REF#refs/tags/}" = "$tag"
-          fi
-          if gh release view "$tag" >/dev/null 2>&1; then
-            test "$(gh release view "$tag" --json isDraft --jq .isDraft)" = true || { echo 'Release already published; use a new version'; exit 1; }
-          else
-            gh release create "$tag" --target "$GITHUB_SHA" --title "ffvpn $(cat VERSION)" --notes-file docs/RELEASE.md --draft
-          fi
-          gh release upload "$tag" dist/release/* --clobber
-          gh release edit "$tag" --notes-file docs/RELEASE.md --draft=false --latest
+          python3 build/upload.py --assets dist/release

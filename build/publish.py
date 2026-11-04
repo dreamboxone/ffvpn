@@ -7,11 +7,13 @@ import json
 import pathlib
 import shutil
 import subprocess
+import sys
 
 p = argparse.ArgumentParser()
 p.add_argument('--assets', type=pathlib.Path, required=True)
 p.add_argument('--usign', required=True)
 p.add_argument('--key', type=pathlib.Path, required=True)
+p.add_argument('--apk', required=True)
 a = p.parse_args()
 version = pathlib.Path('VERSION').read_text().strip()
 core_version = pathlib.Path('CORE_VERSION').read_text().strip()
@@ -47,6 +49,13 @@ for name in sorted(expected):
     signature = str(manifest) + '.sig'
     subprocess.run([a.usign, '-S', '-m', str(manifest), '-s', str(a.key), '-x', signature], check=True)
     subprocess.run([a.usign, '-V', '-m', str(manifest), '-p', 'files/usr/share/ffvpn/release.pub', '-x', signature], check=True)
+subprocess.run([sys.executable, 'build/native.py', '--assets', str(a.assets), '--apk', a.apk], check=True)
+for package in sorted(a.assets.iterdir()):
+    if package.suffix not in ('.ipk', '.apk'):
+        continue
+    signature = str(package) + '.sig'
+    subprocess.run([a.usign, '-S', '-m', str(package), '-s', str(a.key), '-x', signature], check=True)
+    subprocess.run([a.usign, '-V', '-m', str(package), '-p', 'files/usr/share/ffvpn/release.pub', '-x', signature], check=True)
 from assets import restore_logo
 restore_logo()
 shutil.copyfile('files/www/luci-static/resources/ffvpn/logo.png', a.assets / 'logo.png')
