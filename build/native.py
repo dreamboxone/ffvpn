@@ -113,7 +113,8 @@ for arch in json.loads(pathlib.Path('build/architectures.json').read_text()):
             (control / name).write_text(script)
             (control / name).chmod(0o755)
         ipk = a.assets / f'ffvpn_{version}-1_{arch}.ipk'
-        with tarfile.open(ipk, mode='w:gz') as tar:
+        package_stream = io.BytesIO()
+        with tarfile.open(fileobj=package_stream, mode='w') as tar:
             for name, content in [('debian-binary', b'2.0\n'),
                                   ('control.tar.gz', tar_bytes(control)),
                                   ('data.tar.gz', tar_bytes(root))]:
@@ -121,6 +122,7 @@ for arch in json.loads(pathlib.Path('build/architectures.json').read_text()):
                 info.size = len(content)
                 info.mode = 0o644
                 tar.addfile(info, io.BytesIO(content))
+        ipk.write_bytes(gzip.compress(package_stream.getvalue(), mtime=0))
         apkmeta = root / 'lib/apk/packages'
         apkmeta.mkdir(parents=True)
         (apkmeta / 'ffvpn.conffiles').write_text('/etc/config/ffvpn\n')
@@ -128,6 +130,8 @@ for arch in json.loads(pathlib.Path('build/architectures.json').read_text()):
         (apkmeta / 'ffvpn.conffiles_static').write_text('/etc/config/ffvpn ' + config_hash + '\n')
         names = sorted('/' + f.relative_to(root).as_posix() for f in root.rglob('*') if f.is_file())
         (apkmeta / 'ffvpn.list').write_text('\n'.join(names) + '\n')
+        for path in root.rglob('*'):
+            os.utime(path, (0, 0))
         apk = a.assets / f'ffvpn-{version}-r1-{arch}.apk'
         command = [a.apk, 'mkpkg', '--info', 'name:ffvpn', '--info', f'version:{version}-r1',
                    '--info', f'arch:{arch}', '--info', 'description:Firefox VPN with integrated LuCI',

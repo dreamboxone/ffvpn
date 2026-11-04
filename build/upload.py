@@ -22,7 +22,7 @@ headers = {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
 def request(method, url, value=None, binary=False):
     payload = value if binary else json.dumps(value).encode() if value is not None else None
     request_headers = {**headers, 'Content-Type': 'application/octet-stream' if binary else 'application/json'}
-    for attempt in range(12):
+    for attempt in range(60):
         req = urllib.request.Request(url, data=payload, headers=request_headers, method=method)
         try:
             with urllib.request.urlopen(req, timeout=240) as response:
