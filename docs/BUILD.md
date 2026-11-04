@@ -11,7 +11,7 @@ sh build/core.sh arm_cortex-a7_neon-vfpv4 dist/ffvpn-core
 python3 build/release.py --binary dist/ffvpn-core --out dist/release --arch arm_cortex-a7_neon-vfpv4 --key /private/path/release.key
 ```
 
-The GitHub workflow runs only when manually dispatched. It tests the source and builds every architecture in `build/architectures.json`. Its artifacts are unsigned; they are not installable published releases until an authorized maintainer signs every manifest with the private key corresponding to `files/usr/share/ffvpn/release.pub`.
+The GitHub workflow validates pushes to main and can also be dispatched manually. It tests the source and builds every architecture in `build/architectures.json`. Its artifacts are unsigned; they are not installable published releases until an authorized maintainer signs every manifest with the private key corresponding to `files/usr/share/ffvpn/release.pub`.
 
 Keep the signing key outside the repository. For each `.manifest`, create its detached `.manifest.sig` with `usign -S`. Upload the manifests, signatures and compressed blocks to the same release. The installer pins the public key. Account data, routing state and private keys must never be included in release artifacts.
 
