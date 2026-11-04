@@ -100,14 +100,14 @@ return view.extend({
   var self=this, state=initial, root, content, current='Home', signup=null;
   try{signup=sessionStorage.getItem('ffvpn-signin');}catch(e){}
   function keepSignin(id){signup=id;try{if(id)sessionStorage.setItem('ffvpn-signin',id);else sessionStorage.removeItem('ffvpn-signin');}catch(e){}}
-  var power=E('input',{type:'checkbox',checked:!!state.enabled,'aria-label':t('Master switch')});
+  var power=E('input',{type:'checkbox',checked:!!state.enabled,'aria-label':t('Main Switch')});
   var phase=E('span',{'class':'ff-status-badge'},t('Starting'));
   var routerUptime=E('span',{'class':'mk-uptime-value',dir:'auto'},'—');
   var details=E('pre',{'class':'ff-details'});
   var engines=E('div',{'class':'ff-grid'});
   var lastCountry=null;try{lastCountry=JSON.parse(localStorage.getItem('ffvpn-last-country'));}catch(e){}
   function rememberCountry(code,name){if(!/^[A-Z]{2}$/.test(String(code||'').toUpperCase()))return;lastCountry={code:String(code).toUpperCase(),name:name||code};try{localStorage.setItem('ffvpn-last-country',JSON.stringify(lastCountry));}catch(e){}}
-  var masterCard=E('div',{'class':'ff-power ff-basic-power'},[E('label',{'class':'ff-switch'},[power,E('span',{'class':'ff-slider'})]),E('strong',{},t('Master switch'))]);
+  var masterCard=E('div',{'class':'ff-power ff-basic-power'},[E('label',{'class':'ff-switch'},[power,E('span',{'class':'ff-slider'})]),E('strong',{},t('Main Switch'))]);
   var integrationButton=null,integrationTarget=null,integrationPending=false;
   var refreshLogPage=null;
   var updateText=null, updateVersions={}, updatePending=null, homeFields={}, usagePeriod='today', usageData=null;
@@ -279,7 +279,7 @@ return view.extend({
     var routerCard=homeCard('Router information','Router','#3b82f6',[line('Model','model'),line('Firmware','firmware'),line('Memory','memory'),line('CPU load','load')]);
     var connectionCard=homeCard('Connection status','Globe','#3b82f6',[]);connectionCard.classList.add('pwp-social-card');
     [['arvancloud','ArvanCloud','#00a99d'],['soft98','Soft98','#339c54'],['nvidia','NVIDIA','#76b900'],['intel','Intel','#0071c5']].forEach(function(site){
-     var value=E('span',{'class':'pwp-check-value'},t('Test connection'));
+     var value=E('span',{'class':'pwp-check-value'},t('Check'));
      var check=E('button',{type:'button','class':'pwp-social-check',style:'--site-colour:'+site[2],click:function(){
       var previous=connectionCard.querySelector(':scope > .ff-inline-note');if(previous)previous.remove();check.disabled=true;value.textContent=t('Connecting');value.className='pwp-check-value mk-wait';
       callConnectionCheck(site[0]).then(checked).then(function(r){var ms=Number(r.ms)||0;value.textContent=ms>0&&r.http_code!=='000'?formatLatency(ms):'—';value.className='pwp-check-value '+(ms>0&&r.http_code!=='000'?'mk-on':'mk-bad');}).catch(function(e){value.textContent='—';note(t(e.message),true,connectionCard);}).finally(function(){check.disabled=false;});
