@@ -3,7 +3,7 @@
 reply_error() { json_init; json_add_string error "$1"; json_dump; }
 case "$1" in
 	list)
-		printf '%s\n' '{"status":{},"usage":{},"api":{"path":""},"api_write":{"method":"","path":"","body":""},"power":{"enabled":true,"confirmed":true},"mode":{"value":""},"directory":{"value":""},"clock":{},"update":{"component":"","action":""},"update_status":{}}'
+		printf '%s\n' '{"status":{},"usage":{},"logs":{},"logs_clear":{"component":""},"connection_check":{"site":""},"integration":{"enabled":true,"target":"","confirmed":true},"api":{"path":""},"api_write":{"method":"","path":"","body":""},"power":{"enabled":true,"confirmed":true},"mode":{"value":""},"directory":{"value":""},"clock":{"now":0},"update":{"component":"","action":""},"update_status":{}}'
 		;;
 	call)
 		read -r input
@@ -11,6 +11,21 @@ case "$1" in
 		case "$2" in
 			status)
 				json_init
+                core_state=$(/usr/libexec/ffvpn/api GET /status 2>/dev/null)
+                active_id=$(jsonfilter -s "$core_state" -e '@.active_account.id' 2>/dev/null)
+                started=$(jsonfilter -s "$core_state" -e '@.proxy.started_at' 2>/dev/null)
+                case "$active_id" in ''|*[!a-zA-Z0-9_-]*) ;; *)
+                    if [ -n "$started" ] && [ "$started" != '0001-01-01T00:00:00Z' ]; then
+                        mkdir -p /etc/ffvpn/first-use
+                        [ -s "/etc/ffvpn/first-use/$active_id" ] || printf '%s\n' "$started" > "/etc/ffvpn/first-use/$active_id"
+                    fi;;
+                esac
+                json_add_object first_use
+                for first in /etc/ffvpn/first-use/*; do
+                    [ -f "$first" ] || continue
+                    json_add_string "${first##*/}" "$(cat "$first")"
+                done
+                json_close_object
 				json_add_boolean enabled "$(uci -q get ffvpn.main.enabled || echo 0)"
 				json_add_string integration "$(uci -q get ffvpn.main.integration || echo auto)"
 				json_add_string target "$(cat /etc/ffvpn/network-state/target 2>/dev/null)"
@@ -44,6 +59,33 @@ case "$1" in
 				done
 				json_dump
 				;;
+			connection_check)
+                json_get_var site site
+                case "$site" in
+                    arvancloud) url=https://arvancloud.ir;;
+                    soft98) url=https://soft98.ir;;
+                    nvidia) url=https://nvidia.com;;
+                    intel) url=https://intel.com;;
+                    *) reply_error 'Invalid test site'; exit 0;;
+                esac
+                [ "$(uci -q get ffvpn.main.enabled)" = 1 ] || { reply_error 'The master switch is off. Turn it on first.'; exit 0; }
+                measured=$(curl -sS -o /dev/null --proxy socks5h://127.0.0.1:10810 --connect-timeout 8 --max-time 15 -w '%{http_code} %{time_total}' "$url" 2>/dev/null)
+                code=${measured%% *}; elapsed=${measured#* }
+                ms=$(awk -v seconds="$elapsed" 'BEGIN {printf "%.0f", seconds*1000}')
+                json_init; json_add_int ms "${ms:-0}"; json_add_string http_code "$code"; json_dump
+                ;;
+            logs)
+                entries=$(/usr/libexec/ffvpn/api GET /logs | jsonfilter -e '@.entries')
+                cleared=$(cat /etc/ffvpn/log-cleared-at 2>/dev/null)
+                core_cleared=$(cat /etc/ffvpn/core-log-cleared-at 2>/dev/null)
+                printf '{"entries":%s,"cleared_before":"%s","core_cleared_before":"%s"}\n' "${entries:-[]}" "$cleared" "$core_cleared"
+                ;;
+            logs_clear)
+                json_get_var component component
+                case "$component" in core) file=/etc/ffvpn/core-log-cleared-at;; runtime|'') file=/etc/ffvpn/log-cleared-at;; *) reply_error 'Invalid component'; exit 0;; esac
+                date -u '+%Y-%m-%dT%H:%M:%SZ' > "$file"
+                echo '{"ok":true}'
+                ;;
 			usage)
 				if [ -s /tmp/ffvpn-usage.json ] && jsonfilter -i /tmp/ffvpn-usage.json -e '@.days' >/dev/null 2>&1; then cat /tmp/ffvpn-usage.json
 				elif [ -s /etc/ffvpn/usage.json ] && jsonfilter -i /etc/ffvpn/usage.json -e '@.days' >/dev/null 2>&1; then cat /etc/ffvpn/usage.json
@@ -58,6 +100,19 @@ case "$1" in
 				result=$(printf '%s' "$body" | /usr/libexec/ffvpn/api "$method" "$path" 2>/dev/null) || { reply_error 'Core request failed; check the runtime log.'; exit 0; }
 				[ -n "$result" ] && printf '%s\n' "$result" || echo '{}'
 				;;
+            integration)
+                json_get_var enabled enabled; json_get_var target target; json_get_var confirmed confirmed
+                [ ! -d /var/lock/ffvpn-control ] || { reply_error 'Another ffvpn operation is in progress.'; exit 0; }
+                if [ "$enabled" = 1 ]; then
+                    [ "$confirmed" = 1 ] || { reply_error 'Confirm the routing changes first.'; exit 0; }
+                    case "$target" in zirgozar|passwall2) ;; *) reply_error 'Choose Zirgozar or PassWall2.'; exit 0;; esac
+                    [ -x "/etc/init.d/$target" ] || { reply_error 'The selected routing engine is not installed.'; exit 0; }
+                    /usr/libexec/ffvpn/control integrate "$target" </dev/null >/tmp/ffvpn-control.log 2>&1 &
+                else
+                    /usr/libexec/ffvpn/control restore </dev/null >/tmp/ffvpn-control.log 2>&1 &
+                fi
+                echo '{"started":true}'
+                ;;
 			power)
 				json_get_var enabled enabled; json_get_var confirmed confirmed
 				if [ "$enabled" = 1 ]; then
@@ -76,7 +131,10 @@ case "$1" in
 				if result=$(/usr/libexec/ffvpn/control directory "$value" 2>&1); then echo '{"ok":true}'; else reply_error "$result"; fi
 				;;
 			clock)
-				if result=$(/usr/libexec/ffvpn/control clock 2>&1); then echo '{"ok":true}'; else reply_error "$result"; fi
+				json_get_var now now
+                if result=$(/usr/libexec/ffvpn/control clock "${now:-0}" 2>&1); then
+                    if [ "$result" = 'Router clock is already configured.' ]; then echo '{"ok":true,"already":true}'; else echo '{"ok":true,"already":false}'; fi
+                else reply_error "$result"; fi
 				;;
 			update)
 				json_get_var component component; json_get_var action action

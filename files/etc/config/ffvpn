@@ -1,4 +1,5 @@
 config ffvpn 'main'
 	option enabled '0'
+	option network_enabled '0'
 	option integration 'auto'
 	option core_dir '/usr/bin'

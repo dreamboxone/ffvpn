@@ -15,23 +15,62 @@ core_power() {
 	token=$(cat /etc/ffvpn/core/local-api.token)
 	printf '{"on":%s,"auto":true}' "$1" | curl -fsS --max-time 10 -H "X-Local-Token: $token" -H 'Content-Type: application/json' --data-binary @- http://127.0.0.1:10820/api/power >/dev/null
 }
+enable_proxy() {
+	/usr/libexec/ffvpn/proxy configure
+	core_power true
+	uci set ffvpn.main.enabled=1
+	uci commit ffvpn
+	/etc/init.d/ffvpn enable
+}
 case ${1:-} in
 	on)
 		printf '1\n' > /tmp/ffvpn-power-target
-		core_power true
-		if ! /usr/libexec/ffvpn/network apply; then core_power false || true; exit 1; fi
-		uci set ffvpn.main.enabled=1
-		uci commit ffvpn
-		/etc/init.d/ffvpn enable
+		enable_proxy
 		echo 'ffvpn enabled.'
 		;;
 	off)
 		printf '0\n' > /tmp/ffvpn-power-target
 		core_power false
 		/usr/libexec/ffvpn/network restore
+		/usr/libexec/ffvpn/proxy stop
 		uci set ffvpn.main.enabled=0
+		uci set ffvpn.main.network_enabled=0
+		uci -q delete ffvpn.main.integration_core_was_on || true
 		uci commit ffvpn
 		echo 'ffvpn disabled; routing settings restored.'
+		;;
+	integrate)
+		target=${2:-}
+		case "$target" in zirgozar|passwall2) ;; *) echo 'Choose Zirgozar or PassWall2.' >&2; exit 2;; esac
+		[ -x "/etc/init.d/$target" ] || { echo 'The selected routing engine is not installed.' >&2; exit 1; }
+		current=$(cat /etc/ffvpn/network-state/target 2>/dev/null || true)
+		[ "$current" != "$target" ] || { echo 'Routing is already configured.'; exit 0; }
+		[ -z "$current" ] || { echo 'Restore the current routing engine before selecting another.' >&2; exit 1; }
+		status=$(/usr/libexec/ffvpn/api GET /status)
+		ready=$(printf '%s' "$status" | jsonfilter -e '@.accounts.ready')
+		[ "${ready:-0}" -gt 0 ] || { echo 'Add a ready Mozilla account before configuring routing.' >&2; exit 1; }
+		was_on=$(uci -q get ffvpn.main.enabled || echo 0)
+		uci set "ffvpn.main.integration=$target"
+		uci commit ffvpn
+		printf '1\n' > /tmp/ffvpn-power-target
+		enable_proxy
+		if ! /usr/libexec/ffvpn/network apply; then
+			if [ "$was_on" != 1 ]; then core_power false || true; /usr/libexec/ffvpn/proxy stop || true; uci set ffvpn.main.enabled=0; uci commit ffvpn; fi
+			exit 1
+		fi
+		uci set "ffvpn.main.integration_core_was_on=$was_on"
+		uci set ffvpn.main.network_enabled=1
+		uci commit ffvpn
+		echo 'Routing configured.'
+		;;
+	restore)
+		was_on=$(uci -q get ffvpn.main.integration_core_was_on || uci -q get ffvpn.main.enabled || echo 0)
+		/usr/libexec/ffvpn/network restore
+		uci set ffvpn.main.network_enabled=0
+		uci -q delete ffvpn.main.integration_core_was_on || true
+		if [ "$was_on" != 1 ]; then core_power false || true; /usr/libexec/ffvpn/proxy stop || true; uci set ffvpn.main.enabled=0; fi
+		uci commit ffvpn
+		echo 'Previous routing settings restored.'
 		;;
 	mode)
 		case ${2:-} in auto|passwall2|zirgozar) ;; *) exit 2;; esac
@@ -48,6 +87,14 @@ case ${1:-} in
 		echo 'The next core install or update will use this directory.'
 		;;
 	clock)
+        reference=${2:-0}
+        case "$reference" in ''|*[!0-9]*) reference=0;; esac
+        now=$(date +%s)
+        delta=$((now-reference)); [ "$delta" -ge 0 ] || delta=$((-delta))
+        if [ "$reference" -gt 1600000000 ] && [ "$delta" -le 120 ] && [ "$(uci -q get system.@system[0].zonename)" = Asia/Tehran ] && [ "$(uci -q get system.ntp.enabled || echo 1)" = 1 ] && /etc/init.d/sysntpd running >/dev/null 2>&1; then
+            echo 'Router clock is already configured.'
+            exit 0
+        fi
 		# Same timezone and additive time-server configuration as Zirgozar.
 		uci -q get system.ntp >/dev/null || uci set system.ntp=timeserver
 		servers=$(uci -q get system.ntp.server || true)

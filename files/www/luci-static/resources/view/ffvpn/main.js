@@ -6,15 +6,20 @@
 'require ffvpn.i18n as i18n';
 'require ffvpn.theme as themeUI';
 'require ffvpn.flags as flags';
+'require ffvpn.logs as logText';
 
 var callStatus = rpc.declare({object:'luci.ffvpn', method:'status', expect:{}});
+var callConnectionCheck=rpc.declare({object:'luci.ffvpn',method:'connection_check',params:['site'],expect:{}});
+var callIntegration=rpc.declare({object:'luci.ffvpn',method:'integration',params:['enabled','target','confirmed'],expect:{}});
+var callLogs=rpc.declare({object:'luci.ffvpn',method:'logs',expect:{}});
+var callLogsClear=rpc.declare({object:'luci.ffvpn',method:'logs_clear',params:['component'],expect:{}});
 var callUsage = rpc.declare({object:'luci.ffvpn', method:'usage', expect:{}});
 var callAPI = rpc.declare({object:'luci.ffvpn', method:'api', params:['path'], expect:{}});
 var callWrite = rpc.declare({object:'luci.ffvpn', method:'api_write', params:['method','path','body'], expect:{}});
 var callPower = rpc.declare({object:'luci.ffvpn', method:'power', params:['enabled','confirmed'], expect:{}});
 var callMode = rpc.declare({object:'luci.ffvpn', method:'mode', params:['value'], expect:{}});
 var callDirectory = rpc.declare({object:'luci.ffvpn', method:'directory', params:['value'], expect:{}});
-var callClock = rpc.declare({object:'luci.ffvpn', method:'clock', expect:{}});
+var callClock = rpc.declare({object:'luci.ffvpn', method:'clock', params:['now'], expect:{}});
 var callUpdate = rpc.declare({object:'luci.ffvpn', method:'update', params:['component','action'], expect:{}});
 var callUpdateStatus = rpc.declare({object:'luci.ffvpn', method:'update_status', expect:{}});
 var t = function(s) { return i18n.t(s); };
@@ -23,6 +28,7 @@ function write(path, body, method) { return callWrite(method || 'POST', path, JS
 function note(message, error, anchor) {
  if(!anchor)anchor=document.querySelector('.ffvpn main');
  if(!anchor)return;
+ if(anchor.dataset&&anchor.dataset.update){var updateCard=anchor.closest('.ff-card');var messageHost=updateCard&&updateCard.querySelector('.ff-update-message');if(messageHost)anchor=messageHost;}
  var host=anchor;
  if(anchor.tagName==='BUTTON'){
   host=anchor.parentElement;
@@ -33,20 +39,28 @@ function note(message, error, anchor) {
  box.textContent=message;box.classList.toggle('ff-error',!!error);
 }
 function button(label, action) {
- return E('button', {'class':'mk-btn','type':'button', click:function(event) {
+ var result=E('button', {'class':'mk-btn','type':'button', click:function(event) {
  var el=event.currentTarget; el.disabled=true;el.classList.add('mk-running');
   var oldNote=el.parentElement.querySelector(':scope > .ff-inline-note');if(oldNote)oldNote.remove();
   Promise.resolve().then(function(){return action(el);}).catch(function(e){ note(t('Operation failed') + ': ' + t(e.message),true,el); }).finally(function(){if(!el.ffBusy){el.disabled=false;el.classList.remove('mk-running');}});
  }}, t(label));
+ if(['Remove','Delete','Clear logs'].indexOf(label)>=0){result.classList.add('danger');result.prepend(icon('Trash'));}
+ return result;
 }
 function card(title, children) { return E('section', {'class':'mk-card ff-card'}, [E('h3',{},t(title))].concat(children)); }
 function homeCard(title,ico,accent,children){return E('section',{'class':'mk-card ff-home-card',style:'--accent:'+accent},[E('div',{'class':'mk-card-title'},[E('span',{'class':'mk-metric-ico'},icon(ico)),E('span',{},t(title))])].concat(children));}
 function formatGB(value){return (Math.max(0,Number(value)||0)/1000000000).toLocaleString(i18n.get(),{minimumFractionDigits:2,maximumFractionDigits:2});}
-function uptime(seconds){var n=Math.max(0,Number(seconds)||0);return Math.floor(n/86400)+' '+t('Days')+' '+String(Math.floor(n/3600)%24).padStart(2,'0')+':'+String(Math.floor(n/60)%60).padStart(2,'0');}
+function accountDate(value){if(!value||!Number.isFinite(Date.parse(value)))return t('Not recorded');return new Intl.DateTimeFormat(i18n.get()==='fa'?'fa-IR-u-ca-persian':i18n.get()+'-u-ca-gregory',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value));}
+function formatLatency(value){return Number(value).toLocaleString(i18n.get(),{maximumFractionDigits:0})+' '+(i18n.get()==='fa'?'م‌ثانیه':'ms');}
+function formatKB(value){return (Math.max(0,Number(value)||0)/1024).toLocaleString(i18n.get(),{maximumFractionDigits:2});}
+function uptime(seconds){var n=Math.max(0,Math.floor(Number(seconds)||0));return String(Math.floor(n/3600)).padStart(2,'0')+':'+String(Math.floor(n/60)%60).padStart(2,'0')+':'+String(n%60).padStart(2,'0');}
 function countryName(code,fallback){
  if(String(code).toUpperCase()==='REC'||/recom+ended/i.test(fallback||''))return t('Recommended location');
- try{if(/^[A-Z]{2}$/.test(String(code).toUpperCase()))return new Intl.DisplayNames([i18n.get()],{type:'region'}).of(String(code).toUpperCase());}catch(e){}
- return fallback||code||'—';
+ if(i18n.get()==='fa'&&String(code).toUpperCase()==='US')return 'آمریکا';
+ if(i18n.get()==='fa'&&String(code).toUpperCase()==='SE')return 'سوئد';
+ var name=fallback||code||'—';
+ try{if(/^[A-Z]{2}$/.test(String(code).toUpperCase()))name=new Intl.DisplayNames([i18n.get()],{type:'region'}).of(String(code).toUpperCase());}catch(e){}
+ return i18n.get()==='fa'?i18n.clean(name):name;
 }
 function cityName(name,code){
  if(/recom+ended/i.test(name||''))return t('Recommended city');
@@ -64,6 +78,8 @@ function icon(name) {
  paths.Router='M3 10h18v10H3zM7 6V2M17 6V2M7 15h.01M11 15h.01M15 15h2';
  paths.Chart='M3 3v18h18M7 17v-5M12 17V7M17 17v-9';
  paths.Pulse='M2 12h5l3-8 4 16 3-8h5';
+ paths.Copy='M9 9h12v12H9zM5 15H3V3h12v2';paths.Trash='M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7';paths.Check='M5 12l4 4L19 6';
+ paths.Eye='M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0';
  var svg=document.createElementNS('http://www.w3.org/2000/svg','svg'),p=document.createElementNS('http://www.w3.org/2000/svg','path');
  svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('class','ff-icon mk-ico');svg.setAttribute('aria-hidden','true');
  p.setAttribute('d',paths[name]||paths.Overview);p.setAttribute('fill','none');p.setAttribute('stroke','currentColor');p.setAttribute('stroke-width','1.7');p.setAttribute('stroke-linecap','round');p.setAttribute('stroke-linejoin','round');svg.appendChild(p);
@@ -75,7 +91,7 @@ function select(items, value, change) {
  el.value=value;
  return el;
 }
-var warning='Enable ffvpn? The selected engine will use the local ffvpn SOCKS proxy. Router traffic will bypass that engine to prevent loops. The other routing engine will be disabled. These settings will be restored when ffvpn is disabled; later manual edits will be preserved.';
+var warning='Enable the ffvpn SOCKS proxy for local network devices without a username or password?';
 
 return view.extend({
  handleSave:null, handleSaveApply:null, handleReset:null,
@@ -85,9 +101,15 @@ return view.extend({
   try{signup=sessionStorage.getItem('ffvpn-signin');}catch(e){}
   function keepSignin(id){signup=id;try{if(id)sessionStorage.setItem('ffvpn-signin',id);else sessionStorage.removeItem('ffvpn-signin');}catch(e){}}
   var power=E('input',{type:'checkbox',checked:!!state.enabled,'aria-label':t('Master switch')});
-  var phase=E('strong',{},t('Starting'));
+  var phase=E('span',{'class':'ff-status-badge'},t('Starting'));
+  var routerUptime=E('span',{'class':'mk-uptime-value',dir:'auto'},'—');
   var details=E('pre',{'class':'ff-details'});
   var engines=E('div',{'class':'ff-grid'});
+  var lastCountry=null;try{lastCountry=JSON.parse(localStorage.getItem('ffvpn-last-country'));}catch(e){}
+  function rememberCountry(code,name){if(!/^[A-Z]{2}$/.test(String(code||'').toUpperCase()))return;lastCountry={code:String(code).toUpperCase(),name:name||code};try{localStorage.setItem('ffvpn-last-country',JSON.stringify(lastCountry));}catch(e){}}
+  var masterCard=E('div',{'class':'ff-power ff-basic-power'},[E('label',{'class':'ff-switch'},[power,E('span',{'class':'ff-slider'})]),E('strong',{},t('Master switch'))]);
+  var integrationButton=null,integrationTarget=null,integrationPending=false;
+  var refreshLogPage=null;
   var updateText=null, updateVersions={}, updatePending=null, homeFields={}, usagePeriod='today', usageData=null;
   function line(label,key){var node=E('bdi',{dir:'auto'},'—');homeFields[key]=node;return E('div',{'class':'pwp-detail-row ff-detail-row'},[E('span',{},t(label)),node]);}
   function renderUsage(){
@@ -108,24 +130,29 @@ return view.extend({
   function status(){
    return Promise.all([callStatus(),callAPI('/status').catch(function(){return {};})]).then(function(values){
     if(!root.isConnected)return;
+    if(current==='Logs'&&refreshLogPage)refreshLogPage().catch(function(){});
     state=values[0]; var core=values[1], s=core.state||{};
+    if(integrationButton){var active=!!state.target;integrationButton.textContent=t(active?'Restore settings':'Apply settings')+(active?'':': '+(integrationTarget.value==='zirgozar'?t('Zirgozar'):'PassWall2'));integrationButton.disabled=!!state.busy||integrationPending;integrationButton.classList.toggle('mk-running',!!state.busy);integrationTarget.disabled=active||!!state.busy;if(state.control_error)note(t(state.control_error),true,integrationButton);}
     power.checked=state.busy?!!state.desired:!!state.enabled;power.disabled=!!state.busy;
     var text={running:'Running',off:'Off',starting:'Starting',error:'Error',waiting:'Connecting'}[s.phase]||'Starting';
     if(s.code==='no_accounts'||s.code==='no_usable_account')text='Waiting for an account';
     if(s.code==='waiting_for_network')text='Waiting for network';
     if(state.busy)text='Connecting';
-    phase.textContent=t(text);
+    phase.replaceChildren(E('span',{'class':'mk-chip '+(!state.enabled?'':s.phase==='running'?'ok':s.phase==='error'?'error':'warn')},t(!state.enabled?'Off':text)));
+    routerUptime.textContent=uptime((state.router||{}).uptime);
     details.textContent=s.message||'';
     if(state.control_error)details.textContent+='\n'+state.control_error;
     if(core.proxy)details.textContent+='\n'+(core.proxy.country_name||'')+' '+(core.proxy.upstream||'');
     if(current==='Home'&&homeFields.model){
      var router=state.router||{},proxy=core.proxy||{},exit=core.exit||{},test=core.last_test||{};
-     homeFields.model.textContent=router.model||'—';homeFields.firmware.textContent=router.version?'OpenWrt '+router.version:'—';homeFields.arch.textContent=router.architecture||'—';homeFields.uptime.textContent=uptime(router.uptime);
+     homeFields.model.textContent=router.model||'—';homeFields.firmware.textContent=router.version?'OpenWrt '+router.version:'—';
      homeFields.memory.textContent=router.memory_total?Math.round((1-Number(router.memory_free)/Number(router.memory_total))*100)+'%':'—';homeFields.load.textContent=router.load?(Number(router.load)/65536).toFixed(2):'—';
      homeFields.country.textContent=countryName(proxy.country_code||core.selection,proxy.country_name||core.selection_name||t('Recommended location'));homeFields.server.textContent=proxy.upstream||'—';homeFields.protocol.textContent=proxy.transport?proxy.transport.toUpperCase().replace('H','HTTP/'):'—';
-     homeFields.connection.textContent=!state.enabled?t('Off'):test.ok?t('Connected'):t('Not tested');homeFields.latency.textContent=test.total_ms?test.total_ms+' ms':'—';homeFields.ip.textContent=exit.ipv4||test.exit_ipv4||'—';
-     homeFields.orb.replaceChildren(flag(exit.country_code||proxy.country_code,homeFields.country.textContent));
-     if(homeFields.rate)homeFields.rate.textContent='↓ '+formatGB((core.traffic||{}).down_rate)+' '+t('GB')+'/s · ↑ '+formatGB((core.traffic||{}).up_rate)+' '+t('GB')+'/s';
+     homeFields.latency.textContent=state.enabled&&(exit.latency_ms>0||test.total_ms>0)?formatLatency(exit.latency_ms||test.total_ms):'—';
+     if(proxy.country_code)rememberCountry(proxy.country_code,proxy.country_name);
+     else if(!lastCountry)rememberCountry(core.selection,core.selection_name);
+     if(lastCountry){homeFields.country.textContent=countryName(lastCountry.code,lastCountry.name);homeFields.orb.replaceChildren(flag(lastCountry.code,homeFields.country.textContent));}
+     if(homeFields.rate)homeFields.rate.textContent='↓ '+formatKB((core.traffic||{}).down_rate)+' '+(i18n.get()==='fa'?'کیلوبایت/ثانیه':'KB/s')+' · ↑ '+formatKB((core.traffic||{}).up_rate)+' '+(i18n.get()==='fa'?'کیلوبایت/ثانیه':'KB/s');
      callUsage().then(function(data){usageData=data;renderUsage();}).catch(function(){});
     }
     engines.replaceChildren.apply(engines,['zirgozar','passwall2'].map(function(name){
@@ -153,7 +180,7 @@ return view.extend({
   }
   power.addEventListener('change',function(){
    var enabled=power.checked;
-   if(enabled&&!window.confirm(t(warning)+'\n\n'+t('LAN proxying and DNS-over-HTTPS will be enabled. If Zirgozar is the other routing engine, its kill switch will be disabled temporarily.'))){power.checked=false;return;}
+   if(enabled&&!window.confirm(t(warning))){power.checked=false;return;}
    power.disabled=true;
    callPower(enabled,true).then(checked).then(function(){power.checked=enabled;}).catch(function(e){power.checked=!!state.enabled;power.disabled=false;note(e.message,true,power.closest('.ff-power'));});
   });
@@ -162,14 +189,26 @@ return view.extend({
     var list=E('div',{'class':'ff-list'});
     (r.accounts||[]).forEach(function(a,index){
      var id=encodeURIComponent(a.id);
-     function move(delta){var ids=r.accounts.map(function(item){return item.id;}),to=index+delta;if(to<0||to>=ids.length)return;var swap=ids[to];ids[to]=ids[index];ids[index]=swap;return write('/accounts/order',{ids:ids}).then(showAccounts);}
-     list.appendChild(card(a.email||a.name,[E('p',{},(a.status||'')+(a.used_percent!=null?' · '+a.used_percent.toFixed(1)+'%':'')),E('div',{'class':'ff-actions'},[
-      button('Use now',function(){return write('/accounts/'+id+'/activate').then(showAccounts);}),
+     function move(delta){var ids=r.accounts.map(function(item){return item.id;}),to=index+delta;if(to<0||to>=ids.length)return;ids.splice(to,0,ids.splice(index,1)[0]);return write('/accounts/order',{ids:ids}).then(showAccounts);}
+     var quota=a.usage||{},limit=Number(quota.limit_bytes)||0,remaining=Number(quota.remaining_bytes)||0;
+     var accountCard=card('',[E('p',{},t({ready:'Ready',reserved:'Reserved',reauth_required:'Sign in again',unavailable:'Unavailable'}[a.status]||'Unavailable')+(a.used_percent!=null?' · '+t('Quota used')+': '+a.used_percent.toLocaleString(i18n.get(),{maximumFractionDigits:1})+'%':'')),E('div',{'class':'ff-actions'},[
+      (function(){var use=button('Use',function(){return write('/accounts/'+id+'/activate').then(showAccounts);});use.classList.add('success');return use;})(),
       button(a.enabled?'Disabled':'Enabled',function(){return write('/accounts/'+id+'/enabled',{enabled:!a.enabled}).then(showAccounts);}),
       button('Refresh',function(){return write('/accounts/'+id+'/refresh').then(showAccounts);}),
-      button('Move up',function(){return move(-1);}),button('Move down',function(){return move(1);}),
       button('Remove',function(){if(window.confirm(t('Remove this account?')))return write('/accounts/'+id,{},'DELETE').then(showAccounts);})
-     ])]));
+     ])]);
+     var stats=E('div',{'class':'ff-account-quota'});
+     var used=quota.unlimited?t('Unlimited'):limit?formatGB(Math.max(0,limit-remaining))+' '+t('GB'):t('Not recorded');
+     [[t('Used traffic'),used],[t('Remaining traffic'),quota.unlimited?t('Unlimited'):limit?formatGB(remaining)+' '+t('GB'):t('Not recorded')],[t('Total quota'),quota.unlimited?t('Unlimited'):limit?formatGB(limit)+' '+t('GB'):t('Not recorded')],[t('First use'),accountDate((state.first_use||{})[a.id])],[t('Traffic reset'),quota.unlimited?'—':accountDate(quota.reset_at)]].forEach(function(item){stats.appendChild(E('div',{'class':'ff-quota-item'},[E('span',{},item[0]),E('bdi',{dir:'auto','class':'ff-quota-value'},i18n.get()==='fa'&&String(item[1]).endsWith(' '+t('GB'))?[E('bdi',{dir:'ltr'},String(item[1]).slice(0,-(' '+t('GB')).length)),E('span',{},t('GB'))]:item[1])]));});
+     accountCard.appendChild(stats);
+     var refresh=accountCard.querySelector('.ff-actions').children[2];refresh.prepend(icon('Updates'));refresh.classList.add('primary');
+     var address=E('bdi',{'dir':'ltr','class':'ff-email-hidden'},'••••••@••••••'),revealed=false;
+     var eye=E('button',{'type':'button','class':'mk-icobtn ff-email-eye','aria-label':t('Show email'),'aria-pressed':'false',click:function(){
+      revealed=!revealed;address.textContent=revealed?(a.email||a.name):'••••••@••••••';address.classList.toggle('ff-email-hidden',!revealed);eye.setAttribute('aria-label',t(revealed?'Hide email':'Show email'));eye.setAttribute('aria-pressed',String(revealed));
+     }},[icon('Eye')]);
+     accountCard.dataset.accountIndex=String(index);accountCard.classList.add('ff-account-card');
+     var handle=E('button',{type:'button','class':'mk-icobtn ff-account-handle','aria-label':t('Drag to reorder'),title:t('Drag to reorder'),keydown:function(e){if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();Promise.resolve(move(e.key==='ArrowUp'?-1:1)).catch(function(err){note(err.message,true,handle);});}},pointerdown:function(e){e.preventDefault();handle.setPointerCapture(e.pointerId);accountCard.classList.add('ff-dragging');},pointerup:function(e){accountCard.classList.remove('ff-dragging');if(handle.hasPointerCapture(e.pointerId))handle.releasePointerCapture(e.pointerId);var hit=document.elementFromPoint(e.clientX,e.clientY),target=hit&&hit.closest('.ff-account-card');if(target&&target!==accountCard)Promise.resolve(move(Number(target.dataset.accountIndex)-index)).catch(function(err){note(err.message,true,handle);});},pointercancel:function(){accountCard.classList.remove('ff-dragging');}},'⠿');
+     var actions=accountCard.querySelector('.ff-actions'),head=accountCard.querySelector('h3');head.replaceChildren(E('span',{'class':'ff-account-identity'},[handle,address,eye]),actions);list.appendChild(accountCard);
     });
     if(!(r.accounts||[]).length)list.appendChild(E('p',{},t('No accounts yet.')));
     return list;
@@ -209,38 +248,75 @@ return view.extend({
     E('div',{'class':'ff-form-row'},[E('label',{},[E('span',{},t('Verification code or answer')),answer]),E('div',{'class':'ff-actions'},[continueButton,button('Cancel',function(){if(signup)return write('/signin/'+encodeURIComponent(signup),{},'DELETE').then(function(){keepSignin(null);result.textContent='';});})])])
    ]);
   }
+  function baseOptions(connection){
+
+    return callAPI('/settings').then(checked).then(function(r){
+     function change(section,key,value){
+      return callAPI('/settings').then(checked).then(function(latest){
+       var cfg=latest.config;cfg[section][key]=value;
+       cfg.dashboard.listen='127.0.0.1:10820';
+       cfg.system_proxy.mode='clear';cfg.routing.enabled=false;
+       return write('/settings',{config:cfg},'PUT');
+      }).then(function(){note(t('Saved'));}).catch(function(e){note(e.message,true);});
+     }
+     var relay=E('input',{type:'url',value:r.config.network.api_relay||'',placeholder:'https://',change:function(){change('network','api_relay',relay.value);}});
+     connection.appendChild(E('div',{'class':'ff-connection-grid'},[
+      E('label',{'class':'ff-setting-field'},[E('span',{},t('Connection protocol')),select([['h2','HTTP/2'],['h3','HTTP/3']],r.config.proxy.transport,function(v){change('proxy','transport',v);})]),
+      E('label',{'class':'ff-setting-field'},[E('span',{},t('TLS fragmentation')),select([['off','Off'],['sni','SNI'],['first-byte','First byte'],['record','TLS record']],r.config.network.hello_split||'off',function(v){change('network','hello_split',v);})]),
+      E('label',{'class':'ff-setting-field'},[E('span',{},t('Relay server')),relay])
+     ]));
+     var clock=button('Set router clock',function(anchor){return callClock(Math.floor(Date.now()/1000)).then(checked).then(function(r){note(t(r.already?'Router clock is already configured.':'Router clock configured'),false,anchor);});});clock.classList.add('primary');clock.prepend(icon('Updates'));connection.appendChild(E('div',{'class':'ff-setting-row ff-clock-row'},[clock]));
+    });
+  }
   function show(tab){
    current=tab;content.replaceChildren();updateText=null;
    root.querySelectorAll('[data-tab]').forEach(function(el){el.classList.toggle('ff-active',el.dataset.tab===tab);});
    if(tab==='Home'){
     homeFields={};
-    var statusCard=homeCard('Status','Pulse','#10b981',[phase,line('Country','country'),line('Server','server'),line('Protocol','protocol')]);statusCard.classList.add('zgz-connection-card');
+    var statusCard=homeCard('Status','Pulse','#10b981',[line('Country','country'),line('Server','server'),line('Protocol','protocol'),line('Latency','latency')]);statusCard.classList.add('zgz-connection-card');statusCard.querySelector('.mk-card-title').appendChild(phase);
     homeFields.orb=E('div',{'class':'zgz-country-orb'},[icon('Globe')]);
     statusCard.appendChild(E('div',{'class':'zgz-connection-art','aria-hidden':'true'},[E('div',{'class':'zgz-orbit zgz-orbit-one'}),E('div',{'class':'zgz-orbit zgz-orbit-two'}),homeFields.orb]));
-    var routerCard=homeCard('Router information','Router','#3b82f6',[line('Model','model'),line('Firmware','firmware'),line('Architecture','arch'),line('Uptime','uptime'),line('Memory','memory'),line('CPU load','load')]);
-    var testButton=button('Test connection',function(anchor){return write('/test').then(function(r){note(r.ok?t('Connected'):t(r.error||'Operation failed'),!r.ok,anchor);return status();});});testButton.prepend(icon('Globe'));testButton.classList.add('soft-blue','mk-small');
-    var connectionCard=homeCard('Connection status','Globe','#3b82f6',[line('Status','connection'),line('Public IP','ip'),line('Latency','latency'),testButton]);
+    var routerCard=homeCard('Router information','Router','#3b82f6',[line('Model','model'),line('Firmware','firmware'),line('Memory','memory'),line('CPU load','load')]);
+    var connectionCard=homeCard('Connection status','Globe','#3b82f6',[]);connectionCard.classList.add('pwp-social-card');
+    [['arvancloud','ArvanCloud','#00a99d'],['soft98','Soft98','#339c54'],['nvidia','NVIDIA','#76b900'],['intel','Intel','#0071c5']].forEach(function(site){
+     var value=E('span',{'class':'pwp-check-value'},t('Test connection'));
+     var check=E('button',{type:'button','class':'pwp-social-check',style:'--site-colour:'+site[2],click:function(){
+      var previous=connectionCard.querySelector(':scope > .ff-inline-note');if(previous)previous.remove();check.disabled=true;value.textContent=t('Connecting');value.className='pwp-check-value mk-wait';
+      callConnectionCheck(site[0]).then(checked).then(function(r){var ms=Number(r.ms)||0;value.textContent=ms>0&&r.http_code!=='000'?formatLatency(ms):'—';value.className='pwp-check-value '+(ms>0&&r.http_code!=='000'?'mk-on':'mk-bad');}).catch(function(e){value.textContent='—';note(t(e.message),true,connectionCard);}).finally(function(){check.disabled=false;});
+     }},[E('span',{'class':'pwp-social-icon'},[E('img',{src:L.resource('ffvpn/site-icons/'+site[0]+(site[0]==='arvancloud'?'.svg':'.ico')),alt:''})]),E('span',{'class':'pwp-social-name'},site[1]),value]);connectionCard.appendChild(check);
+    });
     homeFields.usage={};var values=E('div',{'class':'pwp-usage-values'},['up','down','total'].map(function(key){var node=E('strong',{dir:'ltr'},'—');homeFields.usage[key]=node;return E('div',{'class':'pwp-usage-value'},[E('span',{},t({up:'Upload',down:'Download',total:'Total'}[key])),node]);}));
     var periods=E('div',{'class':'pwp-usage-periods',role:'tablist'},[['today','Today'],['week','Week'],['month','Month']].map(function(item){return E('button',{'type':'button',role:'tab','data-period':item[0],'aria-selected':String(usagePeriod===item[0]),click:function(){usagePeriod=item[0];renderUsage();}},t(item[1]));}));
     homeFields.rate=E('div',{'class':'mk-muted ff-rate'});
     var usageCard=homeCard('Traffic usage','Chart','#3b82f6',[E('div',{'class':'pwp-usage-body'},[values,periods]),E('small',{},t('GB')),homeFields.rate]);usageCard.classList.add('pwp-usage-card');
     content.appendChild(E('div',{'class':'mk-grid mk-metrics pwp-status-row ff-status-row'},[statusCard,routerCard,connectionCard,usageCard]));
-    content.appendChild(card('Basic settings',[engines,E('p',{},t('Whole-network routing requires PassWall2 or Zirgozar.')),E('p',{},t('TCP is limited to ports 80, 443, 8080 and 8443. UDP availability depends on the destination port.'))]));
+    var available=['zirgozar','passwall2'].filter(function(name){return (state[name]||{}).installed;});
+    integrationTarget=select(available.map(function(name){return [name,name==='zirgozar'?'Zirgozar':'PassWall2'];}),state.target||(available.indexOf(state.integration)>=0?state.integration:available[0]),function(){status();});
+    integrationButton=button(state.target?'Restore settings':'Apply settings',function(anchor){
+     var enabled=!state.target;
+     if(enabled&&!window.confirm(t('This creates the ffvpn SOCKS node, enables the selected routing engine, disables its localhost proxy, and sets remote DNS to Cloudflare DoH. The other engine is disabled. Restore settings reverses these changes and preserves later manual edits.')))return;
+     integrationPending=true;
+     return callIntegration(enabled,integrationTarget.value,true).then(checked).then(function(){note(t('Applying settings'),false,anchor);return status();}).finally(function(){integrationPending=false;});
+    });integrationButton.classList.add('primary');
+    var basic=card('Basic settings',[masterCard,engines,E('div',{'class':'ff-actions'},available.length?[integrationTarget,integrationButton]:[E('p',{},t('Whole-network routing requires PassWall2 or Zirgozar.'))]),E('p',{},t('Whole-network routing requires PassWall2 or Zirgozar.')),E('p',{},t('TCP is limited to ports 80, 443, 8080 and 8443. UDP availability depends on the destination port.'))]);content.appendChild(basic);baseOptions(basic).catch(function(e){note(e.message,true,basic);});
    }else if(tab==='Accounts'){
     content.appendChild(E('p',{},t('Multiple Mozilla accounts are supported. Accounts are tried in priority order when quota runs low.')));
-    accountBox=E('div');content.appendChild(accountBox);content.appendChild(signinForm());
+    accountBox=E('div');var addForm=signinForm();addForm.hidden=!signup;var addButton=button('Add user',function(){addForm.hidden=false;addForm.querySelector('input').focus();});addButton.classList.add('primary');content.appendChild(addButton);content.appendChild(accountBox);content.appendChild(addForm);
     return showAccounts();
    }else if(tab==='Servers'){
-    var locations=E('div',{'class':'ff-grid'});content.appendChild(E('div',{'class':'ff-actions'},[
+    var locations=E('div',{'class':'ff-server-list'});content.appendChild(E('div',{'class':'ff-actions'},[
      button('Recommended',function(){return write('/location',{country:'REC'}).then(status);}),
      button('Fastest',function(){return write('/location',{country:'fastest'}).then(status);}),
      button('Measure latency',function(){return write('/locations/ping').then(function(){return show('Servers');});})
     ]));content.appendChild(locations);
-    return callAPI('/locations').then(checked).then(function(r){(r.locations||[]).forEach(function(l){var c=card(countryName(l.code,l.name),[E('p',{},cityName(l.city,l.code)),E('p',{},l.ping_ms?l.ping_ms+' ms':l.ping_error||''),button('Select',function(){return write('/location',{country:l.code}).then(status);})]);c.querySelector('h3').prepend(flag(l.code,countryName(l.code,l.name)));locations.appendChild(c);});});
+    return callAPI('/locations').then(checked).then(function(r){(r.locations||[]).forEach(function(l){var name=countryName(l.code,l.name);locations.appendChild(E('section',{'class':'mk-card ff-server-row'},[
+     E('h3',{'class':'ff-server-name'},[flag(l.code,name),E('span',{},name)]),l.ping_ms?E('bdi',{'class':'ff-server-ping '+(l.ping_ms>3000?'ff-ping-brown':l.ping_ms>2500?'ff-ping-red':l.ping_ms>2000?'ff-ping-orange':l.ping_ms>1500?'ff-ping-yellow':'ff-ping-green'),dir:'auto'},(i18n.get()==='fa'?[E('bdi',{dir:'ltr'},Number(l.ping_ms).toLocaleString('fa')),E('span',{},'م‌ثانیه')]:formatLatency(l.ping_ms))):E('span'),button('Select',function(){return write('/location',{country:l.code}).then(function(){rememberCountry(l.code,l.name);return status();});})
+    ]));});});
    }else if(tab==='Updates'){
     updateText=E('pre',{'class':'ff-details',style:'display:none'});
-    function updateButton(label,component,action){var b=button(label,function(){
+    function updateButton(label,component,action){var b=button(label,function(anchor){
      if(action!=='check'&&!window.confirm(t('Start the update? The connection may briefly stop.')))return;
+     var old=anchor.closest('.ff-card').querySelector('.ff-update-message');if(old)old.replaceChildren();
      updatePending={component:component,action:action,time:Date.now()};
      root.querySelectorAll('[data-update]').forEach(function(el){el.disabled=true;el.ffBusy=true;});
      return callUpdate(component,action).then(checked).then(status).catch(function(e){updatePending=null;root.querySelectorAll('[data-update]').forEach(function(el){el.disabled=false;el.ffBusy=false;el.classList.remove('mk-running');});throw e;});
@@ -249,7 +325,7 @@ return view.extend({
     ['app','core'].forEach(function(component){
      updateVersions[component]=E('p',{});
      content.appendChild(card(component==='app'?'ffvpn':'Core',[E('div',{'class':'ff-update-row'},[
-      updateVersions[component],E('div',{'class':'ff-actions'},[updateButton('Check for updates',component,'check'),updateButton('Update now',component,'update'),updateButton('Reinstall',component,'reinstall')])
+      E('div',{'class':'ff-update-version'},[updateVersions[component],E('div',{'class':'ff-update-message',role:'status'})]),E('div',{'class':'ff-actions'},[updateButton('Check for updates',component,'check'),updateButton('Update now',component,'update'),updateButton('Reinstall',component,'reinstall')])
      ])]));
     });
     updateVersions.path=E('code',{'dir':'ltr'});
@@ -264,31 +340,32 @@ return view.extend({
     updateVersions.space=E('p',{});content.appendChild(updateVersions.space);
     content.appendChild(updateText);
    }else if(tab==='Logs'){
-    var logs=E('pre',{'class':'ff-details ff-log'});content.appendChild(card('Logs',[button('Refresh',function(){return callAPI('/logs').then(checked).then(function(r){logs.textContent=JSON.stringify(r,null,2);});}),logs]));
-    return callAPI('/logs').then(checked).then(function(r){logs.textContent=JSON.stringify(r,null,2);});
-   }else{
-    var connection=E('div');
-    content.appendChild(card('Settings',[E('div',{'class':'ff-setting-row'},[E('label',{},t('Routing engine')),select([['auto','Automatic'],['zirgozar','Zirgozar'],['passwall2','PassWall2']],state.integration,function(value){
-     if(state.enabled){note(t('Turn ffvpn off before changing the routing engine.'),true);return show('Settings');}
-     callMode(value).then(checked).then(status).catch(function(e){note(e.message,true);});
-    })]),E('div',{'class':'ff-setting-row'},[button('Set router clock',function(anchor){if(window.confirm(t('Set Tehran timezone and add Iranian time servers, as in Zirgozar?')))return callClock().then(checked).then(function(){note(t('Router clock configured'),false,anchor);});})])]));
-    content.appendChild(connection);
-    return callAPI('/settings').then(checked).then(function(r){
-     function change(section,key,value){
-      return callAPI('/settings').then(checked).then(function(latest){
-       var cfg=latest.config;cfg[section][key]=value;
-       cfg.dashboard.listen='127.0.0.1:10820';cfg.proxy.listen='127.0.0.1:10810';
-       cfg.system_proxy.mode='clear';cfg.routing.enabled=false;
-       return write('/settings',{config:cfg},'PUT');
-      }).then(function(){note(t('Saved'));}).catch(function(e){note(e.message,true);});
-     }
-     var relay=E('input',{type:'url',value:r.config.network.api_relay||'',placeholder:'https://',change:function(){change('network','api_relay',relay.value);}});
-     connection.appendChild(card('Settings',[E('div',{'class':'ff-connection-grid'},[
-      E('label',{'class':'ff-setting-field'},[E('span',{},t('Connection protocol')),select([['h2','HTTP/2'],['h3','HTTP/3']],r.config.proxy.transport,function(v){change('proxy','transport',v);})]),
-      E('label',{'class':'ff-setting-field'},[E('span',{},t('TLS fragmentation')),select([['off','Off'],['sni','SNI'],['first-byte','First byte'],['record','TLS record']],r.config.network.hello_split||'off',function(v){change('network','hello_split',v);})]),
-      E('label',{'class':'ff-setting-field'},[E('span',{},t('Relay server')),relay])
-     ])]));
-    });
+    var runtime=E('pre',{'class':'mk-log'+(i18n.get()==='fa'?' mk-log-fa':''),dir:i18n.get()==='fa'?'rtl':'ltr'}),coreLog=E('pre',{'class':'mk-log'+(i18n.get()==='fa'?' mk-log-fa':''),dir:i18n.get()==='fa'?'rtl':'ltr'});
+    function logTitle(entry){var m=entry.message||'';
+     var patterns=[[/proxy turned on=true/,'Proxy enabled'],[/proxy turned on=false/,'Proxy disabled'],[/connection test passed/,'Connection test passed'],[/connection test failed/,'Connection test failed'],[/upstream selected/,'Connected to server'],[/service starting/,'Service started'],[/settings saved/,'Settings saved'],[/guardian request failed/,'Mozilla request failed'],[/DNS:/,'DNS settings'],[/dashboard listening/,'Interface started']];
+     for(var i=0;i<patterns.length;i++)if(patterns[i][0].test(m))return t(patterns[i][1]);
+     return t(entry.level==='ERROR'?'Connection error':entry.level==='WARN'?'Warning':'Service event');
+    }
+    function fillLog(box,text){var atEnd=box.scrollTop+box.clientHeight>=box.scrollHeight-10;box.textContent=text||t('No log entries.');if(atEnd||!box.dataset.drawn)box.scrollTop=box.scrollHeight;box.dataset.drawn='1';}
+    function refreshLogs(){return callLogs().then(checked).then(function(r){
+     var runtimeText=[],coreText=[],cutoff=Date.parse(r.cleared_before)||0,coreCutoff=Date.parse(r.core_cleared_before)||0;
+     (r.entries||[]).forEach(function(e){var when=new Intl.DateTimeFormat(i18n.get()==='fa'?'fa-IR-u-ca-persian':i18n.get()+'-u-ca-gregory',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(e.time));var message=String(e.message||'').replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,'••••••@••••••');
+      if(Date.parse(e.time)>cutoff)runtimeText.push(when+' · '+(i18n.get()==='fa'?logText.persian(message):message));
+      if(Date.parse(e.time)>coreCutoff)coreText.push('['+when+'] ['+(i18n.get()==='fa'?({INFO:'اطلاع',WARN:'هشدار',ERROR:'خطا',DEBUG:'اشکال زدایی'}[e.level]||e.level):e.level)+'] '+(i18n.get()==='fa'?logText.persian(message):message));
+     });fillLog(runtime,runtimeText.join('\n'));fillLog(coreLog,coreText.join('\n'));
+    });}
+    function logCard(title,description,box,component,ico,colour){
+     var copy=E('button',{type:'button','class':'mk-icobtn',title:t('Copy'),'aria-label':t('Copy'),click:function(){
+      function copied(){copy.replaceChildren(icon('Check'));copy.classList.add('done');window.setTimeout(function(){copy.replaceChildren(icon('Copy'));copy.classList.remove('done');},1500);}
+      if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(box.textContent).then(copied).catch(function(e){note(e.message,true,copy);});else{var input=E('textarea',{},box.textContent);content.appendChild(input);input.select();var ok=document.execCommand('copy');input.remove();if(ok)copied();else note(t('Copy failed'),true,copy);}
+     }},[icon('Copy')]);
+     var remove=button('Delete',function(){return callLogsClear(component).then(checked).then(refreshLogs);});remove.classList.add('danger','mk-small');
+     var section=card(title,[E('div',{'class':'mk-row ff-log-toolbar'},[E('span',{'class':'cbi-value-description zgz-card-help'},t(description)),E('div',{'class':'ff-log-actions'},[copy,remove])]),box]);
+     section.style.setProperty('--accent',colour);section.querySelector('h3').classList.add('mk-card-title');section.querySelector('h3').prepend(icon(ico));return section;
+    }
+    content.appendChild(logCard('Runtime Logs','What ffvpn does is shown here, refreshed every 5 seconds.',runtime,'runtime','Logs','#1e88e5'));
+    content.appendChild(logCard('Core log','The ffvpn core messages are shown here.',coreLog,'core','Router','#8b5cf6'));
+    refreshLogPage=refreshLogs;return refreshLogs();
    }
    return status();
   }
@@ -300,9 +377,8 @@ return view.extend({
   var mode='auto';try{mode=localStorage.getItem('ffvpn-theme')||'auto';}catch(e){}
   root=E('div',{'class':'mk ffvpn','dir':i18n.get()==='fa'?'rtl':'ltr'},[
    E('link',{rel:'stylesheet',href:L.resource('ffvpn/theme.css')}),E('link',{rel:'stylesheet',href:L.resource('ffvpn/app.css')}),
-   E('div',{'class':'mk-hero','role':'banner'},[E('div',{'class':'mk-brand'},[E('img',{src:L.resource('ffvpn/logo.png'),alt:'ffvpn','class':'ff-logo'}),E('h2',{},'ffvpn'),E('span',{'class':'mk-version'},state.version||'')]),E('div',{'class':'mk-row mk-hero-controls'},[themes,E('div',{'class':'mk-language-column'},[lang])])]),
-   E('nav',{'class':'ff-tabs'},['Home','Accounts','Servers','Settings','Updates','Logs'].map(function(tab){var b=button(tab,function(){return show(tab);});b.prepend(icon(tab));b.dataset.tab=tab;return b;})),
-   E('div',{'class':'ff-power mk-card'},[E('label',{'class':'ff-switch'},[power,E('span',{'class':'ff-slider'})]),E('strong',{},t('Master switch'))]),
+   E('div',{'class':'mk-hero','role':'banner'},[E('div',{'class':'mk-brand'},[E('img',{src:L.resource('ffvpn/logo.png'),alt:'ffvpn','class':'ff-logo'}),E('h2',{},'ffvpn'),E('span',{'class':'mk-version'},state.version||'')]),E('div',{'class':'mk-row mk-hero-controls'},[themes,E('div',{'class':'mk-language-column'},[lang,E('div',{'class':'mk-uptime'},[E('span',{},t('Activity duration')),routerUptime])])])]),
+   E('nav',{'class':'ff-tabs'},['Home','Accounts','Servers','Updates','Logs'].map(function(tab){var b=button(tab,function(){return show(tab);});b.prepend(icon(tab));b.dataset.tab=tab;return b;})),
    content=E('main',{}),
    E('footer',{'class':'mk-footer'},[E('img',{src:L.resource('ffvpn/logo.png'),alt:'ffvpn','class':'ff-footer-logo'}),E('span',{},'ffvpn · Copyright © 2026 dreamboxone · GNU AGPLv3'),
     E('a',{'class':'mk-link',href:'https://t.me/routekernel1',target:'_blank',rel:'noopener noreferrer'},'Telegram · t.me/routekernel1'),

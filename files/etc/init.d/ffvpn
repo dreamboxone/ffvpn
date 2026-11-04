@@ -21,10 +21,12 @@ start_service() {
 }
 
 service_started() {
-	[ "$(uci -q get ffvpn.main.enabled)" = 1 ] || return 0
+	/usr/libexec/ffvpn/proxy configure || return 1
+	[ "$(uci -q get ffvpn.main.network_enabled)" = 1 ] || return 0
 	/usr/libexec/ffvpn/network apply
 }
 
 stop_service() {
 	/usr/libexec/ffvpn/network restore
+	/usr/libexec/ffvpn/proxy stop || true
 }

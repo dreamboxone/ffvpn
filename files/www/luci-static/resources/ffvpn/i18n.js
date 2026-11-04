@@ -1,6 +1,8 @@
 'use strict';
 'require baseclass';
 var words = {
+ 'Show email': ['نمایش ایمیل','显示邮箱','Показать адрес'],
+ 'Hide email': ['مخفی کردن ایمیل','隐藏邮箱','Скрыть адрес'],
  'Days': ['روز','天','дн.'],
  'Checking version': ['در حال بررسی نسخه','正在检查版本','Проверка версии'],
  'Updating files': ['در حال به‌روزرسانی فایل‌ها','正在更新文件','Обновление файлов'],
@@ -132,11 +134,63 @@ var words = {
  'Sign-in complete': ['ورود انجام شد','登录完成','Вход выполнен'],
  'No update has been run yet.': ['هنوز به‌روزرسانی اجرا نشده است.','尚未执行更新。','Обновление ещё не запускалось.']
 };
+words["Apply settings"]=["اعمال تنظیمات", "应用设置", "Применить настройки"];
+words["Restore settings"]=["بازگرداندن تنظیمات", "恢复设置", "Восстановить настройки"];
+words["Applying settings"]=["در حال اعمال تنظیمات", "正在应用设置", "Применение настроек"];
+words["Zirgozar"]=["زیرگذر", "Zirgozar", "Zirgozar"];
+words["Enable the ffvpn SOCKS proxy for local network devices without a username or password?"]=["ساکس ffvpn برای دستگاه های شبکه داخلی بدون نام کاربری و رمز روشن شود؟", "是否启用无需用户名和密码的局域网 SOCKS 代理？", "Включить SOCKS для локальной сети без имени пользователя и пароля?"];
+words["This creates the ffvpn SOCKS node, enables the selected routing engine, disables its localhost proxy, and sets remote DNS to Cloudflare DoH. The other engine is disabled. Restore settings reverses these changes and preserves later manual edits."]=["گره ساکس ffvpn ساخته و موتور انتخاب شده روشن می شود. پروکسی ترافیک خود روتر خاموش و DNS روی DoH کلادفلر تنظیم می شود. موتور دیگر خاموش می شود. با بازگرداندن تنظیمات، تغییرات برمی گردد و ویرایش های بعدی شما حفظ می شود.", "创建 ffvpn SOCKS 节点并启用所选引擎，关闭本机代理，设置 Cloudflare DoH，并停用其他引擎。恢复时保留后续手动修改。", "Будет создан узел SOCKS ffvpn, включен выбранный движок, отключен прокси самого роутера и установлен Cloudflare DoH. Другой движок отключится. Восстановление сохраняет последующие ручные изменения."];
+words["Add user"]=["افزودن کاربر", "添加用户", "Добавить пользователя"];
+words["Copy"]=["کپی", "复制", "Копировать"];
+words["Copied"]=["کپی شد", "已复制", "Скопировано"];
+words["Clear logs"]=["پاک کردن گزارش", "清除日志", "Очистить журнал"];
+words["Clear the displayed log history?"]=["تاریخچه نمایش داده شده پاک شود؟", "清除显示的日志历史？", "Очистить отображаемую историю?"];
+words["Technical details"]=["جزئیات فنی", "技术详情", "Технические сведения"];
+words["No log entries."]=["گزارشی ثبت نشده است.", "暂无日志。", "Записей нет."];
+words["Proxy enabled"]=["پروکسی روشن شد", "代理已启用", "Прокси включен"];
+words["Proxy disabled"]=["پروکسی خاموش شد", "代理已停用", "Прокси выключен"];
+words["Connection test passed"]=["آزمایش اتصال موفق بود", "连接测试成功", "Проверка соединения успешна"];
+words["Connection test failed"]=["آزمایش اتصال ناموفق بود", "连接测试失败", "Проверка соединения не удалась"];
+words["Connected to server"]=["اتصال به سرور برقرار شد", "已连接服务器", "Подключено к серверу"];
+words["Service started"]=["برنامه شروع به کار کرد", "服务已启动", "Служба запущена"];
+words["Settings saved"]=["تنظیمات ذخیره شد", "设置已保存", "Настройки сохранены"];
+words["Mozilla request failed"]=["درخواست به موزیلا ناموفق بود", "Mozilla 请求失败", "Ошибка запроса Mozilla"];
+words["DNS settings"]=["تنظیمات DNS", "DNS 设置", "Настройки DNS"];
+words["Interface started"]=["رابط برنامه راه اندازی شد", "界面已启动", "Интерфейс запущен"];
+words["Connection error"]=["خطای اتصال", "连接错误", "Ошибка соединения"];
+words["Warning"]=["هشدار", "警告", "Предупреждение"];
+words["Service event"]=["رویداد برنامه", "服务事件", "Событие службы"];
+words["The master switch is off. Turn it on first."]=["کلید اصلی خاموش است. ابتدا آن را روشن کنید.", "请先开启主开关。", "Сначала включите главный переключатель."];
+words["Delete"]=["حذف", "删除", "Удалить"];
+words["Runtime Logs"]=["گزارش عملکرد", "运行日志", "Журнал работы"];
+words["Core log"]=["گزارش هسته", "核心日志", "Журнал ядра"];
+words["What ffvpn does is shown here, refreshed every 5 seconds."]=["کارهای ffvpn در اینجا نمایش داده می شود و هر ۵ ثانیه تازه می شود.", "此处显示 ffvpn 的操作，每 5 秒刷新。", "Здесь показаны действия ffvpn. Обновление каждые 5 секунд."];
+words["The ffvpn core messages are shown here."]=["پیام های هسته ffvpn در اینجا نمایش داده می شود.", "此处显示 ffvpn 核心消息。", "Здесь показаны сообщения ядра ffvpn."];
+words['Use']=['استفاده','使用','Использовать'];
+words["Ready"]=["آماده استفاده", "可用", "Готов"];
+words["Reserved"]=["ذخیره", "备用", "Резерв"];
+words["Sign in again"]=["نیاز به ورود دوباره", "需要重新登录", "Войдите снова"];
+words["Unavailable"]=["در دسترس نیست", "不可用", "Недоступен"];
+words["Quota used"]=["سهمیه مصرف شده", "已用配额", "Использовано квоты"];
+words["Drag to reorder"]=["برای تغییر اولویت بکشید", "拖动以调整优先级", "Перетащите для изменения приоритета"];
+words["Used traffic"]=["میزان استفاده شده", "已用流量", "Использовано"];
+words["Remaining traffic"]=["میزان باقیمانده", "剩余流量", "Осталось"];
+words["Total quota"]=["میزان کل", "总配额", "Общая квота"];
+words["First use"]=["زمان شروع استفاده", "首次使用", "Первое использование"];
+words["Traffic reset"]=["زمان ریست مصرف ترافیک", "流量重置时间", "Сброс трафика"];
+words["Not recorded"]=["ثبت نشده", "未记录", "Не записано"];
+words["Unlimited"]=["نامحدود", "无限", "Без ограничений"];
+words['Router clock is already configured.']=['ساعت روتر از قبل تنظیم شده است.','路由器时间已设置。','Время роутера уже настроено.'];
+words['Activity duration']=['مدت فعالیت','运行时长','Время работы'];
 var language = 'fa';
 try { language = localStorage.getItem('ffvpn-language') || 'fa'; } catch(e) {}
 if (['en','fa','zh','ru'].indexOf(language) < 0) language = 'fa';
+function cleanPersian(value) {
+ return String(value).replace(/سوئد/g,'\u0001').replace(/[\u0610-\u061a\u064b-\u065f\u0670\u06d6-\u06ed]/g,'').replace(/[أإ]/g,'ا').replace(/ؤ/g,'و').replace(/ئ/g,'ی').replace(/ء/g,'').replace(/\u0001/g,'سوئد');
+}
 return baseclass.extend({
  get: function() { return language; },
  set: function(value) { if (['en','fa','zh','ru'].indexOf(value) >= 0) { language = value; try { localStorage.setItem('ffvpn-language', value); } catch(e) {} } },
- t: function(key) { var index = ['fa','zh','ru'].indexOf(language); return index >= 0 && words[key] ? words[key][index] : key; }
+ clean: cleanPersian,
+ t: function(key) { var index = ['fa','zh','ru'].indexOf(language), value=index >= 0 && words[key] ? words[key][index] : key; return language==='fa'?cleanPersian(value):value; }
 });

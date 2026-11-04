@@ -7,6 +7,8 @@
 [![版本](https://img.shields.io/github/v/release/dreamboxone/ffvpn?style=for-the-badge)](https://github.com/dreamboxone/ffvpn/releases/latest)
 [![下载](https://img.shields.io/github/downloads/dreamboxone/ffvpn/total?style=for-the-badge)](https://github.com/dreamboxone/ffvpn/releases)
 
+[![Telegram](https://img.shields.io/badge/Telegram-RouteKernel-26A5E4?style=for-the-badge&logo=telegram)](https://t.me/routekernel1)
+
 [فارسی](README.md) · [English](README.en.md) · [简体中文](README.zh.md) · [Русский](README.ru.md)
 
 [网站与源代码](https://github.com/dreamboxone/ffvpn) · [Telegram 支持](https://t.me/routekernel1)
@@ -23,13 +25,25 @@
 
 ## 安装
 
-目标版本为 OpenWrt 23.05、24.10 和 25.12。目前使用 Google WiFi 上的 25.12.6 进行实机测试；其他版本仍需单独验证。需要 LuCI 及 Zirgozar 或 PassWall2。
+目标版本为 OpenWrt 23.05、24.10 和 25.12。目前使用 Google WiFi 上的 25.12.6 进行实机测试；其他版本仍需单独验证。需要 LuCI；全网路由才需要 Zirgozar 或 PassWall2。
 
-首次发布后，通过 SSH 执行：
+通过 SSH 执行：
 
 ```sh
 wget -qO /tmp/ffvpn-install.sh https://raw.githubusercontent.com/dreamboxone/ffvpn/main/install.sh && sh /tmp/ffvpn-install.sh
 ```
+
+## 安装、卸载与设备要求
+
+安装程序自动检测路由器的 OpenWrt 版本与架构，并下载相应文件。支持目标为 23.05、24.10、25.12；硬件测试版本为 25.12.6。架构列表见 [architectures.json](build/architectures.json)。
+
+**安装和卸载使用同一条命令：** 上方命令打开菜单 `1) Install`、`2) Update`、`3) Remove`。卸载时再次运行并选择 **3**。保留账户数据，恢复本程序修改的路由设置。
+
+**闪存：** 程序和核心约需 15–20 MB，未安装的依赖另计。建议至少预留 32 MB 闪存和 64 MB 临时空间。二进制大小因架构而异。
+
+**内存：** 建议路由器总内存至少 256 MB；尚未验证低内存设备的硬性最低要求。测试核心常驻内存约 18 MB，观察到的峰值约 42 MB。Zirgozar 或 PassWall2 需要额外内存。
+
+无需路由引擎即可使用独立 SOCKS：路由器局域网地址，端口 `10810`，默认无用户名和密码，仅允许 LAN 访问。管理 API 仅监听回环地址。全网代理请在基本设置选择 Zirgozar 或 PassWall2 并应用设置；恢复按钮可撤销这些修改。
 
 菜单支持安装、更新和卸载。进入 LuCI → Services → ffvpn 添加 Mozilla 账户。安装后路由默认关闭，卸载会保留账户数据。
 
@@ -37,7 +51,7 @@ wget -qO /tmp/ffvpn-install.sh https://raw.githubusercontent.com/dreamboxone/ffv
 
 核心基于 [arman-vpn-client](https://github.com/armanlife/arman-vpn-client)，增加了 OpenWrt 入口。Mozilla 管理服务端；兼容核心通过 ffvpn 发布。差分下载量取决于实际二进制变化，首次安装需要完整下载。
 
-本项目与 Mozilla 无关联，也未经其认可。配额和可用性由 Mozilla 决定。TCP 仅支持 80、443、8080、8443 端口，UDP 也受端口限制，部分通话、游戏和 SSH 可能无法使用。核心 API 与代理仅监听回环地址，管理使用经过认证的 LuCI 会话。
+本项目与 Mozilla 无关联，也未经其认可。配额和可用性由 Mozilla 决定。TCP 仅支持 80、443、8080、8443 端口，UDP 也受端口限制，部分通话、游戏和 SSH 可能无法使用。管理 API 仅监听回环地址，SOCKS 仅允许 LAN 访问，阻止 WAN 访问。
 
 ## 许可证
 

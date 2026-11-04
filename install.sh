@@ -11,10 +11,10 @@ case "$DISTRIB_RELEASE" in 23.05*|24.10*|25.12*) ;; *) echo "Unsupported OpenWrt
 dependencies() {
 	if command -v apk >/dev/null 2>&1; then
 		apk update
-		apk add curl usign luci-base rpcd jsonfilter
+		apk add curl usign luci-base rpcd jsonfilter nftables-json
 	elif command -v opkg >/dev/null 2>&1; then
 		opkg update
-		opkg install curl usign luci-base rpcd jsonfilter
+		opkg install curl usign luci-base rpcd jsonfilter nftables-json
 	else echo 'No supported package manager.'; exit 1; fi
 }
 
@@ -30,7 +30,7 @@ KEY
 	# The public key is pinned here; a release cannot replace its own trust root.
 	FFVPN_KEY="$stage/release.pub" sh "$stage/update" update
 	if [ ! -f /etc/config/ffvpn ]; then
-		printf "config ffvpn 'main'\n\toption enabled '0'\n\toption integration 'auto'\n\toption core_dir '/usr/bin'\n" > /etc/config/ffvpn
+		printf "config ffvpn 'main'\n\toption enabled '0'\n\toption network_enabled '0'\n\toption integration 'auto'\n\toption core_dir '/usr/bin'\n" > /etc/config/ffvpn
 	fi
 	/etc/init.d/ffvpn enable
 	/etc/init.d/ffvpn restart

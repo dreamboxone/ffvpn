@@ -1,7 +1,31 @@
 {
  "luci-app-ffvpn": {
   "description": "Manage ffvpn",
-  "read": {"ubus": {"luci.ffvpn": ["status", "usage", "api", "update_status"]}},
-  "write": {"ubus": {"luci.ffvpn": ["power", "mode", "directory", "clock", "update", "api_write"]}}
+  "read": {
+   "ubus": {
+    "luci.ffvpn": [
+     "status",
+     "usage",
+     "api",
+     "update_status",
+     "logs"
+    ]
+   }
+  },
+  "write": {
+   "ubus": {
+    "luci.ffvpn": [
+     "power",
+     "mode",
+     "directory",
+     "clock",
+     "update",
+     "api_write",
+     "connection_check",
+     "integration",
+     "logs_clear"
+    ]
+   }
+  }
  }
 }

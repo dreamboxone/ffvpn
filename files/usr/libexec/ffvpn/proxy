@@ -1,0 +1,57 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+set -e
+umask 077
+. /usr/share/libubox/jshn.sh
+
+guard() {
+	device=$(ubus call network.interface.lan status | jsonfilter -e '@.l3_device')
+	case "$device" in ''|*[!a-zA-Z0-9_.:@-]*) echo 'The LAN interface could not be determined.' >&2; exit 1;; esac
+	command -v nft >/dev/null 2>&1 || { echo 'nftables is required to restrict the proxy to LAN.' >&2; exit 1; }
+	rules=$(mktemp /tmp/ffvpn-access.XXXXXX)
+	trap 'rm -f "$rules"' EXIT
+	if nft list table inet ffvpn_access >/dev/null 2>&1; then printf 'delete table inet ffvpn_access\n' > "$rules"; fi
+	cat >> "$rules" <<EOF
+table inet ffvpn_access {
+ chain input {
+  type filter hook input priority -10; policy accept;
+  iifname != { "lo", "$device" } tcp dport 10810 reject
+  iifname != { "lo", "$device" } udp dport 10810 reject
+ }
+}
+EOF
+	nft -c -f "$rules"
+	nft -f "$rules"
+	rm -f "$rules"
+	trap - EXIT
+}
+
+configure() {
+	guard
+	settings=''
+	for attempt in 1 2 3 4 5 6 7 8 9 10; do
+		settings=$(/usr/libexec/ffvpn/api GET /settings 2>/dev/null || true)
+		config=$(jsonfilter -s "$settings" -e '@.config' 2>/dev/null || true)
+		[ -z "$config" ] || break
+		sleep 1
+	done
+	[ -n "$config" ] || { echo 'The proxy service is not ready.' >&2; exit 1; }
+	json_load "$config"
+	json_select proxy
+	json_add_string listen '0.0.0.0:10810'
+	json_add_string username ''
+	json_add_string password ''
+	json_select ..
+	config=$(json_dump)
+	result=$(printf '{"config":%s}' "$config" | /usr/libexec/ffvpn/api PUT /settings)
+	[ "$(jsonfilter -s "$result" -e '@.saved')" = true ] || { echo 'Could not configure the LAN proxy.' >&2; exit 1; }
+}
+
+stop() {
+	# Keep the guard if closing the listener could not be confirmed.
+	token=$(cat /etc/ffvpn/core/local-api.token)
+	printf '{"on":false}' | curl -fsS --max-time 10 -H "X-Local-Token: $token" -H 'Content-Type: application/json' --data-binary @- http://127.0.0.1:10820/api/power >/dev/null
+	if nft list table inet ffvpn_access >/dev/null 2>&1; then nft delete table inet ffvpn_access; fi
+}
+
+case ${1:-} in configure) configure;; stop) stop;; *) exit 2;; esac
