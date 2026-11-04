@@ -42,7 +42,7 @@ function button(label, action) {
 function card(title, children) { return E('section', {'class':'mk-card ff-card'}, [E('h3',{},t(title))].concat(children)); }
 function homeCard(title,ico,accent,children){return E('section',{'class':'mk-card ff-home-card',style:'--accent:'+accent},[E('div',{'class':'mk-card-title'},[E('span',{'class':'mk-metric-ico'},icon(ico)),E('span',{},t(title))])].concat(children));}
 function formatGB(value){return (Math.max(0,Number(value)||0)/1000000000).toLocaleString(i18n.get(),{minimumFractionDigits:2,maximumFractionDigits:2});}
-function uptime(seconds){var n=Math.max(0,Number(seconds)||0);return Math.floor(n/86400)+'d '+String(Math.floor(n/3600)%24).padStart(2,'0')+':'+String(Math.floor(n/60)%60).padStart(2,'0');}
+function uptime(seconds){var n=Math.max(0,Number(seconds)||0);return Math.floor(n/86400)+' '+t('Days')+' '+String(Math.floor(n/3600)%24).padStart(2,'0')+':'+String(Math.floor(n/60)%60).padStart(2,'0');}
 function countryName(code,fallback){
  if(String(code).toUpperCase()==='REC'||/recom+ended/i.test(fallback||''))return t('Recommended location');
  try{if(/^[A-Z]{2}$/.test(String(code).toUpperCase()))return new Intl.DisplayNames([i18n.get()],{type:'region'}).of(String(code).toUpperCase());}catch(e){}
@@ -262,17 +262,16 @@ return view.extend({
      E('p',{'class':'mk-muted'},t('The next core install or update uses this folder. Files under /tmp must be installed again after reboot.'))
     ]));
     updateVersions.space=E('p',{});content.appendChild(updateVersions.space);
-    content.appendChild(updateButton('Check all','all','check'));
     content.appendChild(updateText);
    }else if(tab==='Logs'){
-    var logs=E('pre',{'class':'ff-details'});content.appendChild(card('Logs',[button('Refresh',function(){return callAPI('/logs').then(checked).then(function(r){logs.textContent=JSON.stringify(r,null,2);});}),logs]));
+    var logs=E('pre',{'class':'ff-details ff-log'});content.appendChild(card('Logs',[button('Refresh',function(){return callAPI('/logs').then(checked).then(function(r){logs.textContent=JSON.stringify(r,null,2);});}),logs]));
     return callAPI('/logs').then(checked).then(function(r){logs.textContent=JSON.stringify(r,null,2);});
    }else{
     var connection=E('div');
     content.appendChild(card('Settings',[E('div',{'class':'ff-setting-row'},[E('label',{},t('Routing engine')),select([['auto','Automatic'],['zirgozar','Zirgozar'],['passwall2','PassWall2']],state.integration,function(value){
      if(state.enabled){note(t('Turn ffvpn off before changing the routing engine.'),true);return show('Settings');}
      callMode(value).then(checked).then(status).catch(function(e){note(e.message,true);});
-    })]),E('div',{'class':'ff-setting-row'},[button('Set router clock',function(){if(window.confirm(t('Set Tehran timezone and add Iranian time servers, as in Zirgozar?')))return callClock().then(checked).then(function(){note(t('Router clock configured'));});})])]));
+    })]),E('div',{'class':'ff-setting-row'},[button('Set router clock',function(anchor){if(window.confirm(t('Set Tehran timezone and add Iranian time servers, as in Zirgozar?')))return callClock().then(checked).then(function(){note(t('Router clock configured'),false,anchor);});})])]));
     content.appendChild(connection);
     return callAPI('/settings').then(checked).then(function(r){
      function change(section,key,value){
