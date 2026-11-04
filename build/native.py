@@ -136,6 +136,6 @@ for arch in json.loads(pathlib.Path('build/architectures.json').read_text()):
                    '--script', 'pre-deinstall:' + str(control / 'prerm'),
                    '--script', 'post-deinstall:' + str(control / 'postrm'),
                    '--files', str(root), '--output', str(apk)]
-        subprocess.run(command, check=True, env={**os.environ, 'SOURCE_DATE_EPOCH': '0'})
+        subprocess.run(['fakeroot', *command], check=True, env={**os.environ, 'SOURCE_DATE_EPOCH': '0'})
         subprocess.run([a.apk, 'adbdump', str(apk)], check=True, stdout=subprocess.DEVNULL)
         print('Packaged', arch, flush=True)
