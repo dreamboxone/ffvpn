@@ -16,6 +16,9 @@ p = argparse.ArgumentParser()
 p.add_argument('--assets', type=pathlib.Path, required=True)
 p.add_argument('--apk', required=True)
 a = p.parse_args()
+# Package directories must remain traversable regardless of the signing
+# process's private-key umask. The signing key is outside this staging tree.
+os.umask(0o022)
 version = pathlib.Path('VERSION').read_text().strip()
 dependencies = ['curl', 'usign', 'luci-base', 'rpcd', 'jsonfilter', 'nftables-json']
 postinst = '''#!/bin/sh
