@@ -136,6 +136,14 @@ for arch in json.loads(pathlib.Path('build/architectures.json').read_text()):
                    '--script', 'pre-deinstall:' + str(control / 'prerm'),
                    '--script', 'post-deinstall:' + str(control / 'postrm'),
                    '--files', str(root), '--output', str(apk)]
-        subprocess.run(['fakeroot', *command], check=True, env={**os.environ, 'SOURCE_DATE_EPOCH': '0'})
+        # The SDK loader has its own library path; use actual ownership instead
+        # of injecting a system fakeroot library into the SDK executable.
+        subprocess.run(['sudo', 'chown', '-R', '0:0', str(root)], check=True)
+        try:
+            subprocess.run(['sudo', 'env', 'SOURCE_DATE_EPOCH=0', *command], check=True)
+        finally:
+            owner = f'{os.getuid()}:{os.getgid()}'
+            subprocess.run(['sudo', 'chown', '-R', owner, str(root)], check=True)
+        subprocess.run(['sudo', 'chown', f'{os.getuid()}:{os.getgid()}', str(apk)], check=True)
         subprocess.run([a.apk, 'adbdump', str(apk)], check=True, stdout=subprocess.DEVNULL)
         print('Packaged', arch, flush=True)
