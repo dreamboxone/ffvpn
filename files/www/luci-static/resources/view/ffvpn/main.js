@@ -23,11 +23,20 @@ var callClock = rpc.declare({object:'luci.ffvpn', method:'clock', params:['now']
 var callUpdate = rpc.declare({object:'luci.ffvpn', method:'update', params:['component','action'], expect:{}});
 var callUpdateStatus = rpc.declare({object:'luci.ffvpn', method:'update_status', expect:{}});
 var t = function(s) { return i18n.t(s); };
+function errorMessage(message){
+ var text=String(message||'');
+ if(/TLS handshake timeout/i.test(text))return t('The secure connection to Mozilla timed out. Check the router internet connection and clock, then try again.');
+ if(/context deadline exceeded|i\/o timeout|Client.Timeout/i.test(text))return t('Mozilla did not respond in time. Check the router connection and try again.');
+ if(/no such host/i.test(text))return t('The Mozilla server address could not be resolved. Check router DNS settings.');
+ if(/connection refused|network is unreachable/i.test(text))return t('Cannot connect to Mozilla. Check the router internet connection.');
+ return t(text);
+}
 function checked(result) { if (result && result.error) throw new Error(result.error); return result || {}; }
 function write(path, body, method) { return callWrite(method || 'POST', path, JSON.stringify(body || {})).then(checked); }
 function note(message, error, anchor) {
  if(!anchor)anchor=document.querySelector('.ffvpn main');
  if(!anchor)return;
+ if(anchor.closest&&anchor.closest('.ff-account-card')){var accountHost=anchor.closest('.ff-account-card').querySelector('.ff-account-feedback');if(accountHost)anchor=accountHost;}
  if(anchor.dataset&&anchor.dataset.update){var updateCard=anchor.closest('.ff-card');var messageHost=updateCard&&updateCard.querySelector('.ff-update-message');if(messageHost)anchor=messageHost;}
  var host=anchor;
  if(anchor.tagName==='BUTTON'){
@@ -41,8 +50,8 @@ function note(message, error, anchor) {
 function button(label, action) {
  var result=E('button', {'class':'mk-btn','type':'button', click:function(event) {
  var el=event.currentTarget; el.disabled=true;el.classList.add('mk-running');
-  var oldNote=el.parentElement.querySelector(':scope > .ff-inline-note');if(oldNote)oldNote.remove();
-  Promise.resolve().then(function(){return action(el);}).catch(function(e){ note(t('Operation failed') + ': ' + t(e.message),true,el); }).finally(function(){if(!el.ffBusy){el.disabled=false;el.classList.remove('mk-running');}});
+  var oldNote=(el.closest('.ff-account-card')||el.parentElement).querySelector('.ff-inline-note');if(oldNote)oldNote.remove();
+  Promise.resolve().then(function(){return action(el);}).catch(function(e){ note(t('Operation failed') + ': ' + errorMessage(e.message),true,el); }).finally(function(){if(!el.ffBusy){el.disabled=false;el.classList.remove('mk-running');}});
  }}, t(label));
  if(['Remove','Delete','Clear logs'].indexOf(label)>=0){result.classList.add('danger');result.prepend(icon('Trash'));}
  return result;
@@ -200,7 +209,7 @@ return view.extend({
      var stats=E('div',{'class':'ff-account-quota'});
      var used=quota.unlimited?t('Unlimited'):limit?formatGB(Math.max(0,limit-remaining))+' '+t('GB'):t('Not recorded');
      [[t('Used traffic'),used],[t('Remaining traffic'),quota.unlimited?t('Unlimited'):limit?formatGB(remaining)+' '+t('GB'):t('Not recorded')],[t('Total quota'),quota.unlimited?t('Unlimited'):limit?formatGB(limit)+' '+t('GB'):t('Not recorded')],[t('First use'),accountDate((state.first_use||{})[a.id])],[t('Traffic reset'),quota.unlimited?'—':accountDate(quota.reset_at)]].forEach(function(item){stats.appendChild(E('div',{'class':'ff-quota-item'},[E('span',{},item[0]),E('bdi',{dir:'auto','class':'ff-quota-value'},i18n.get()==='fa'&&String(item[1]).endsWith(' '+t('GB'))?[E('bdi',{dir:'ltr'},String(item[1]).slice(0,-(' '+t('GB')).length)),E('span',{},t('GB'))]:item[1])]));});
-     accountCard.appendChild(stats);
+     accountCard.appendChild(E('div',{'class':'ff-account-feedback',role:'status'}));accountCard.appendChild(stats);
      var refresh=accountCard.querySelector('.ff-actions').children[2];refresh.prepend(icon('Updates'));refresh.classList.add('primary');
      var address=E('bdi',{'dir':'ltr','class':'ff-email-hidden'},'••••••@••••••'),revealed=false;
      var eye=E('button',{'type':'button','class':'mk-icobtn ff-email-eye','aria-label':t('Show email'),'aria-pressed':'false',click:function(){

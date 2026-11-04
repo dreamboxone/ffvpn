@@ -203,3 +203,5 @@
 .ffvpn .ff-update-version .ff-version-chip{width:180px;justify-content:center;flex:0 0 180px}.ffvpn .ff-update-version>p{gap:14px}.ffvpn .mk-uptime-value{direction:ltr;unicode-bidi:isolate}
 
 .ffvpn .mk-btn.danger:hover:not(:disabled),.ffvpn .mk-btn.danger:focus-visible,.ffvpn .mk-btn.danger:active:not(:disabled){background:linear-gradient(135deg,#e11d48,#b91c1c);color:#fff;border-color:transparent}.ffvpn.mk-follow .mk-btn.danger:hover:not(:disabled),.ffvpn.mk-follow .mk-btn.danger:focus-visible,.ffvpn.mk-follow .mk-btn.danger:active:not(:disabled){background:#92252e!important;color:#fff!important}
+
+.ffvpn .ff-account-feedback{text-align:start;font-size:13px;font-weight:400;overflow-wrap:anywhere}.ffvpn[dir=rtl] .ff-account-feedback{direction:rtl;text-align:right}.ffvpn .ff-account-feedback .ff-inline-note{margin:10px 0}
