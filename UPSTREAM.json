@@ -1,0 +1,4 @@
+{
+  "core": {"repository": "https://github.com/armanlife/arman-vpn-client", "commit": "cab15f6f39a0ccc72b159ab1a7a5051c88887aa9", "license": "GPL-3.0"},
+  "interface": {"repository": "https://github.com/dreamboxone/zirgozar", "commit": "a1ff9b743141fb7b81c7927ec07ad65a4b5ce729", "license": "AGPL-3.0-or-later"}
+}

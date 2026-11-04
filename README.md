@@ -2,7 +2,7 @@
 
 # ffvpn
 
-<p align="center"><img src="files/www/luci-static/resources/ffvpn/logo.png" alt="ffvpn" width="200"></p>
+<p align="center"><img src="https://github.com/dreamboxone/ffvpn/releases/latest/download/logo.png" alt="ffvpn" width="200"></p>
 
 کلاینت غیررسمی سرویس VPN داخلی Firefox برای روتر OpenWrt، با رابط یکپارچه LuCI.
 

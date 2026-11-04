@@ -1,0 +1,113 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+set -eu
+umask 077
+STATE=${FFVPN_STATE:-/etc/ffvpn/network-state}
+INIT=${FFVPN_INIT:-/etc/init.d}
+mkdir -p "$STATE"
+
+save_set() {
+	key=$1 value=$2
+	file="$STATE/$key"
+	if [ ! -d "$file" ]; then
+		mkdir "$file"
+		if uci -q get "$key" > "$file/old"; then :; else touch "$file/absent"; fi
+	fi
+	printf '%s\n' "$value" > "$file/new"
+	uci set "$key=$value"
+}
+
+restart_changed() {
+	failed=0
+	for package in passwall2 zirgozar; do
+		[ -f "$STATE/restart.$package" ] || continue
+		uci commit "$package" || failed=1
+		"$INIT/$package" restart || failed=1
+	done
+	return "$failed"
+}
+
+restore() {
+	# Restore options before removing their section; never overwrite a user's edit.
+	for file in "$STATE"/*.*.*; do
+		[ -d "$file" ] || continue
+		key=${file##*/}
+		current=$(uci -q get "$key" || true)
+		if [ "$current" = "$(cat "$file/new")" ]; then
+			if [ -f "$file/absent" ]; then uci -q delete "$key" || true
+			else uci set "$key=$(cat "$file/old")"; fi
+		else
+			logger -t ffvpn "Preserved externally changed option: $key"
+		fi
+		rm -r "$file"
+	done
+	for file in "$STATE"/*.ffvpn_local; do
+		[ -d "$file" ] || continue
+		key=${file##*/}
+		# Delete only a section with no remaining options (edited options survive).
+		if ! uci -q show "$key" | grep -q "^$key\."; then uci -q delete "$key" || true; fi
+		rm -r "$file"
+	done
+	restart_changed || return 1
+	rm -f "$STATE"/restart.* "$STATE/target"
+}
+
+apply() {
+	[ -s "$STATE/target" ] && return 0
+	target=$(uci -q get ffvpn.main.integration || echo auto)
+	if [ "$target" = auto ]; then
+		if [ -x "$INIT/zirgozar" ] && [ "$(uci -q get zirgozar.config.enabled || true)" = 1 ]; then target=zirgozar
+		elif [ -x "$INIT/passwall2" ]; then target=passwall2
+		elif [ -x "$INIT/zirgozar" ]; then target=zirgozar
+		else echo 'Install PassWall2 or Zirgozar before enabling whole-network routing.' >&2; return 1; fi
+	fi
+	case "$target" in passwall2|zirgozar) ;; *) return 1;; esac
+	[ -x "$INIT/$target" ] || return 1
+	# Refuse unresolved edits instead of committing someone else's transaction.
+	for package in passwall2 zirgozar; do
+		[ -z "$(uci -q changes "$package" || true)" ] || { echo "Unsaved $package changes exist." >&2; return 1; }
+	done
+	[ -z "$(uci -q get "$target.ffvpn_local" || true)" ] || { echo 'ffvpn_local section already exists.' >&2; return 1; }
+	trap 'exit 1' HUP INT TERM
+	trap 'result=$?; if [ "$result" != 0 ]; then restore || true; fi' EXIT
+	other=zirgozar
+	[ "$target" = zirgozar ] && other=passwall2
+	if [ -x "$INIT/$other" ]; then
+		touch "$STATE/restart.$other"
+		if [ "$other" = zirgozar ]; then
+			save_set zirgozar.config.enabled 0
+			save_set zirgozar.config.kill_switch 0
+		else save_set 'passwall2.@global[0].enabled' 0; fi
+	fi
+	touch "$STATE/restart.$target"
+	if [ "$target" = passwall2 ]; then
+		save_set passwall2.ffvpn_local nodes
+		save_set passwall2.ffvpn_local.remarks ffvpn
+		save_set passwall2.ffvpn_local.type Xray
+		save_set passwall2.ffvpn_local.protocol socks
+		save_set passwall2.ffvpn_local.address 127.0.0.1
+		save_set passwall2.ffvpn_local.port 10810
+		save_set 'passwall2.@global[0].node' ffvpn_local
+		save_set 'passwall2.@global[0].enabled' 1
+		save_set 'passwall2.@global[0].localhost_proxy' 0
+		save_set 'passwall2.@global[0].client_proxy' 1
+		save_set 'passwall2.@global[0].remote_dns_protocol' doh
+		save_set 'passwall2.@global[0].remote_dns_doh' https://1.1.1.1/dns-query
+	else
+		save_set zirgozar.ffvpn_local node
+		save_set zirgozar.ffvpn_local.link 'socks://127.0.0.1:10810#ffvpn'
+		save_set zirgozar.config.node ffvpn_local
+		save_set zirgozar.config.localhost_proxy 0
+		save_set zirgozar.config.client_proxy 1
+		save_set zirgozar.config.remote_dns_protocol doh
+		save_set zirgozar.config.remote_dns_doh https://1.1.1.1/dns-query
+		save_set zirgozar.config.remote_dns_detour remote
+		save_set zirgozar.config.enabled 1
+	fi
+	if restart_changed; then printf '%s\n' "$target" > "$STATE/target"
+	else restore; return 1; fi
+	trap - HUP INT TERM
+	trap - EXIT
+}
+
+case ${1:-} in apply) apply;; restore) restore;; *) exit 2;; esac

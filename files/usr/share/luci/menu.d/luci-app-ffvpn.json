@@ -1,0 +1,7 @@
+{
+ "admin/services/ffvpn": {
+  "title": "ffvpn", "order": 65,
+  "action": {"type": "view", "path": "ffvpn/main"},
+  "depends": {"acl": ["luci-app-ffvpn"]}
+ }
+}

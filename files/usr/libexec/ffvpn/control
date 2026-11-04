@@ -1,0 +1,64 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 dreamboxone <https://t.me/routekernel1>
+set -eu
+umask 077
+LOCK=/var/lock/ffvpn-control
+mkdir "$LOCK" 2>/dev/null || { echo 'Another ffvpn operation is in progress.' >&2; exit 1; }
+cleanup() {
+	result=$?
+	printf '%s\n' "$result" > /tmp/ffvpn-control.result
+	rmdir "$LOCK"
+}
+trap cleanup EXIT
+core_power() {
+	token=$(cat /etc/ffvpn/core/local-api.token)
+	printf '{"on":%s,"auto":true}' "$1" | curl -fsS --max-time 10 -H "X-Local-Token: $token" -H 'Content-Type: application/json' --data-binary @- http://127.0.0.1:10820/api/power >/dev/null
+}
+case ${1:-} in
+	on)
+		printf '1\n' > /tmp/ffvpn-power-target
+		core_power true
+		if ! /usr/libexec/ffvpn/network apply; then core_power false || true; exit 1; fi
+		uci set ffvpn.main.enabled=1
+		uci commit ffvpn
+		/etc/init.d/ffvpn enable
+		echo 'ffvpn enabled.'
+		;;
+	off)
+		printf '0\n' > /tmp/ffvpn-power-target
+		core_power false
+		/usr/libexec/ffvpn/network restore
+		uci set ffvpn.main.enabled=0
+		uci commit ffvpn
+		echo 'ffvpn disabled; routing settings restored.'
+		;;
+	mode)
+		case ${2:-} in auto|passwall2|zirgozar) ;; *) exit 2;; esac
+		[ "$(uci -q get ffvpn.main.enabled)" != 1 ] || { echo 'Turn ffvpn off before changing routing mode.' >&2; exit 1; }
+		uci set "ffvpn.main.integration=$2"
+		uci commit ffvpn
+		;;
+	directory)
+		directory=${2:-/usr/bin}
+		case "$directory" in *..*|*[!a-zA-Z0-9_./-]*) echo 'Invalid core directory.' >&2; exit 2;; esac
+		case "$directory" in /usr/*|/opt/*|/mnt/*|/overlay/*|/tmp/*) ;; *) echo 'Choose a directory under /usr, /opt, /mnt, /overlay or /tmp.' >&2; exit 2;; esac
+		uci set "ffvpn.main.core_dir=$directory"
+		uci commit ffvpn
+		echo 'The next core install or update will use this directory.'
+		;;
+	clock)
+		# Same timezone and additive time-server configuration as Zirgozar.
+		uci -q get system.ntp >/dev/null || uci set system.ntp=timeserver
+		servers=$(uci -q get system.ntp.server || true)
+		for server in ntp.day.ir ntp.faraborddi.com ntp.time.ir; do
+			case " $servers " in *" $server "*) ;; *) uci add_list "system.ntp.server=$server";; esac
+		done
+		uci set 'system.@system[0].timezone=<+0330>-3:30'
+		uci set 'system.@system[0].zonename=Asia/Tehran'
+		uci commit system
+		/etc/init.d/system reload
+		/etc/init.d/sysntpd restart
+		;;
+	*) exit 2;;
+esac

@@ -1,0 +1,7 @@
+/dist/
+/.tools/
+*.key
+*.pub
+!files/usr/share/ffvpn/release.pub
+__pycache__/
+/files/www/luci-static/resources/ffvpn/logo.png

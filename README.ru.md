@@ -1,0 +1,46 @@
+# ffvpn
+
+<p align="center"><img src="https://github.com/dreamboxone/ffvpn/releases/latest/download/logo.png" alt="ffvpn" width="200"></p>
+
+Неофициальный клиент встроенного VPN Firefox для OpenWrt с интегрированным интерфейсом LuCI.
+
+[![Версия](https://img.shields.io/github/v/release/dreamboxone/ffvpn?style=for-the-badge)](https://github.com/dreamboxone/ffvpn/releases/latest)
+[![Загрузки](https://img.shields.io/github/downloads/dreamboxone/ffvpn/total?style=for-the-badge)](https://github.com/dreamboxone/ffvpn/releases)
+
+[فارسی](README.md) · [English](README.en.md) · [简体中文](README.zh.md) · [Русский](README.ru.md)
+
+[Сайт и исходный код](https://github.com/dreamboxone/ffvpn) · [Поддержка в Telegram](https://t.me/routekernel1)
+
+## Возможности
+
+- Установка вместе с LuCI, четыре языка, светлая и тёмная темы, тема маршрутизатора и значки вкладок.
+- Несколько учётных записей Mozilla, порядок приоритета, квоты и автоматическое переключение.
+- Немедленное применение настроек и переключатель включения без Save & Apply.
+- Обнаружение Zirgozar и PassWall2; предупреждение перед изменениями маршрутизации и восстановление при выключении с сохранением последующих ручных правок.
+- Отдельная проверка, обновление и переустановка приложения и ядра; путь к ядру и свободное место.
+- Подписанные выпуски и загрузка только изменённых файлов и двоичных блоков.
+- Часовой пояс Тегерана и иранские серверы времени, как в Zirgozar.
+
+## Установка
+
+Целевые версии: OpenWrt 23.05, 24.10 и 25.12. Испытания на оборудовании сейчас проводятся на Google WiFi с 25.12.6; остальные версии требуют отдельной проверки. Нужны LuCI и Zirgozar либо PassWall2.
+
+После первого опубликованного выпуска выполните через SSH:
+
+```sh
+wget -qO /tmp/ffvpn-install.sh https://raw.githubusercontent.com/dreamboxone/ffvpn/main/install.sh && sh /tmp/ffvpn-install.sh
+```
+
+Меню предлагает установку, обновление и удаление. Откройте LuCI → Services → ffvpn и добавьте учётную запись Mozilla. После установки маршрутизация выключена. При удалении данные учётных записей сохраняются.
+
+## Ядро и ограничения
+
+Ядро основано на [arman-vpn-client](https://github.com/armanlife/arman-vpn-client) с отдельной точкой входа для OpenWrt. Mozilla обновляет серверный сервис; совместимые сборки ядра распространяются через ffvpn. Размер дифференциальной загрузки зависит от изменений двоичных данных; при первой установке нужны все файлы.
+
+Проект не связан с Mozilla и не одобрен ею. Квоты и доступность определяет Mozilla. TCP ограничен портами 80, 443, 8080 и 8443; UDP также имеет ограничения портов. Некоторые звонки, игры и SSH могут не работать. API и прокси ядра слушают только loopback, управление использует авторизованный сеанс LuCI.
+
+## Лицензии
+
+Интерфейс и инструменты: AGPL-3.0-or-later. Исходное ядро сохраняет GPL-3.0. Тема и настройка часов взяты из [Zirgozar](https://github.com/dreamboxone/zirgozar). Лицензия Vazirmatn приложена к шрифту. Версии источников указаны в [UPSTREAM.json](UPSTREAM.json).
+
+ffvpn · Copyright © 2026 dreamboxone · GNU AGPLv3 · Без гарантий

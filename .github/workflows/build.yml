@@ -1,0 +1,78 @@
+name: Build OpenWrt releases
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.2'
+          cache-dependency-path: core/go.sum
+      - name: Check scripts and interfaces
+        run: python3 test/check.py
+      - name: Test core behavior
+        working-directory: core
+        run: go test ./cmd/ffvpn ./internal/service ./internal/proxy ./internal/accounts ./internal/config ./internal/fxa
+      - name: Test differential block compatibility
+        run: |
+          sh build/core.sh x86_64 dist/ffvpn-core
+          python3 test/chunks.py dist/ffvpn-core
+  build:
+    needs: test
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - family: armv7
+            architectures: 'arm_cortex-a7_neon-vfpv4 arm_cortex-a7 arm_cortex-a7_vfpv4 arm_cortex-a5_vfpv4 arm_cortex-a8_vfpv3 arm_cortex-a9 arm_cortex-a9_neon arm_cortex-a9_vfpv3-d16 arm_cortex-a15_neon-vfpv4'
+          - family: armv6
+            architectures: 'arm_arm1176jzf-s_vfp'
+          - family: armv5
+            architectures: 'arm_arm926ej-s arm_xscale'
+          - family: arm64
+            architectures: 'aarch64_cortex-a53 aarch64_cortex-a72 aarch64_cortex-a76 aarch64_generic'
+          - family: mipsle
+            architectures: 'mipsel_24kc mipsel_74kc mipsel_mips32'
+          - family: mips
+            architectures: 'mips_24kc mips_4kec mips_mips32'
+          - family: mips64
+            architectures: 'mips64_octeonplus mips64_mips64r2'
+          - family: mips64le
+            architectures: 'mips64el_mips64r2'
+          - family: amd64
+            architectures: 'x86_64'
+          - family: i386
+            architectures: 'i386_pentium4'
+          - family: riscv64
+            architectures: 'riscv64_riscv64'
+          - family: loong64
+            architectures: 'loongarch64_generic'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.2'
+          cache-dependency-path: core/go.sum
+      - name: Build architecture family
+        env:
+          ARCHITECTURES: ${{ matrix.architectures }}
+        run: |
+          set -eu
+          set -- $ARCHITECTURES
+          sh build/core.sh "$1" dist/core
+          for arch in "$@"; do
+            python3 build/release.py --binary dist/core --out dist/release --arch "$arch" --manifest-only
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffvpn-${{ matrix.family }}
+          path: |
+            dist/release/*.manifest
+            dist/release/*.gz
+          if-no-files-found: error
+          retention-days: 14

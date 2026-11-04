@@ -1,0 +1,94 @@
+.ffvpn{padding:20px;border-radius:20px;background:var(--bg);color:var(--text);min-height:65vh}
+.ffvpn .ff-card{padding:22px;margin:14px 0;border:1px solid var(--line);border-radius:18px;background:var(--panel)}
+.ffvpn .ff-card h3{margin:0 0 14px;color:var(--text)}
+.ffvpn .ff-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.ffvpn .ff-actions,.ffvpn .ff-tabs{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.ffvpn .mk-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:10px 16px;margin:0;background:var(--soft,#eef2ff);color:var(--text,#1b2540);border:1px solid var(--line,#dbe2ef);border-radius:10px;font-weight:600;line-height:1.4;text-shadow:none;cursor:pointer}
+.ffvpn .mk-btn:hover:not(:disabled){background:var(--line,#dbe2ef);color:var(--text,#1b2540)}
+.ffvpn .mk-btn:disabled{opacity:.55;cursor:wait}
+.ffvpn .mk-btn.primary,.ffvpn .ff-tabs .ff-active{background:var(--zgz-accent,#4f46e5);color:var(--zgz-on-accent,#fff);border-color:transparent}
+.ffvpn .mk-seg .mk-btn.glass{background:transparent;color:var(--text,#1b2540);border-color:transparent}
+.ffvpn .mk-seg .mk-btn.glass.mk-seg-on{background:var(--zgz-accent,#4f46e5);color:var(--zgz-on-accent,#fff)}
+.ffvpn:not(.mk-follow) .mk-hero .mk-seg .mk-btn.glass{color:#fff}
+.ffvpn .ff-form-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px;margin:16px 0}
+.ffvpn .ff-form-row label{display:flex;flex:1 1 220px;flex-direction:column;gap:8px;color:var(--text,#1b2540);margin:0}
+.ffvpn .ff-form-row input{box-sizing:border-box;width:100%;min-height:44px;margin:0;padding:11px 13px;background:var(--panel,#fff);color:var(--text,#1b2540);border:1px solid var(--line,#cbd5e1);border-radius:10px}
+.ffvpn .ff-form-row .mk-btn{flex:0 0 auto;min-width:94px}
+.ffvpn .ff-signin-state:not(:empty){padding:12px 14px;background:var(--soft,#f1f5f9);border:1px solid var(--line,#dbe2ef);border-radius:10px;line-height:1.7}
+.ffvpn .ff-tabs{margin:20px 0}
+.ffvpn .ff-tabs .mk-btn{display:inline-flex;align-items:center;gap:8px}
+.ffvpn [data-tab=Home] .ff-icon{color:#059669}
+.ffvpn [data-tab=Accounts] .ff-icon{color:#2563eb}
+.ffvpn [data-tab=Servers] .ff-icon{color:#7c3aed}
+.ffvpn [data-tab=Settings] .ff-icon{color:#d97706}
+.ffvpn [data-tab=Updates] .ff-icon{color:#0891b2}
+.ffvpn [data-tab=Logs] .ff-icon{color:#e11d48}
+.ffvpn.mk-dark [data-tab=Home] .ff-icon{color:#34d399}
+.ffvpn.mk-dark [data-tab=Accounts] .ff-icon{color:#60a5fa}
+.ffvpn.mk-dark [data-tab=Servers] .ff-icon{color:#c084fc}
+.ffvpn.mk-dark [data-tab=Settings] .ff-icon{color:#fbbf24}
+.ffvpn.mk-dark [data-tab=Updates] .ff-icon{color:#22d3ee}
+.ffvpn.mk-dark [data-tab=Logs] .ff-icon{color:#fb7185}
+.ffvpn .ff-tabs .ff-active .ff-icon{color:#fff}
+.ffvpn .ff-logo{width:76px;height:90px;object-fit:contain;flex:none}
+.ffvpn .ff-footer-logo{width:36px;height:42px;object-fit:contain;flex:none}
+.ffvpn .ff-icon{width:19px;height:19px;flex:none}
+.ffvpn .ff-country-flag{width:30px;height:22px;object-fit:cover;border-radius:4px;flex:none;vertical-align:middle;margin-inline-end:10px;box-shadow:0 0 0 1px #00000012}
+.ffvpn .ff-version-chip{display:inline-flex;width:max-content;max-width:100%;margin-inline-end:12px;direction:ltr;unicode-bidi:isolate;white-space:nowrap}
+.ffvpn .ff-update-row{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.ffvpn .ff-update-row>p{flex:1 1 220px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0}
+.ffvpn .ff-update-row .ff-actions{flex:0 1 auto}
+.ffvpn .mk-grid.ff-status-row{grid-template-columns:minmax(0,1.8fr) repeat(3,minmax(0,1fr));max-width:none;gap:14px;align-items:stretch;margin:20px 0}
+.ffvpn .ff-home-card{min-width:0;margin:0;padding:18px;position:relative;overflow-wrap:anywhere}
+.ffvpn .ff-home-card .mk-card-title{display:flex;align-items:center;gap:10px;min-height:40px;margin:0 0 14px;font-size:15px;font-weight:700}
+.ffvpn .ff-home-card .mk-metric-ico{color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.ffvpn .ff-home-card .ff-detail-row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:12px;min-width:0}
+.ffvpn .ff-detail-row>bdi{overflow-wrap:anywhere;text-align:end;min-width:0}
+.ffvpn .ff-detail-row>span{color:var(--muted);flex:none}
+.ffvpn .ff-home-card .zgz-country-orb .ff-country-flag{margin:0;border-radius:0}
+.ffvpn .ff-home-card .ff-action{margin-top:14px}
+.ffvpn .ff-home-card .pwp-usage-value strong{font-size:20px}
+.ffvpn .ff-rate{font-size:10px;margin-top:12px;direction:ltr}
+.ffvpn .ff-engine-state{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px 0}
+@media(max-width:1150px){.ffvpn .mk-grid.ff-status-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.ffvpn .mk-grid.ff-status-row{grid-template-columns:minmax(0,1fr)}.ffvpn .ff-home-card{padding:18px}}
+.ffvpn .ff-active{background:var(--primary,#4f46e5);color:#fff}
+.ffvpn .ff-power{display:flex;align-items:center;gap:16px;padding:20px;border-radius:18px;background:var(--panel)}
+.ffvpn .ff-switch{position:relative;display:inline-block;width:52px;height:30px;flex:none;margin:0}
+.ffvpn .ff-switch input{opacity:0;width:0;height:0;position:absolute}
+.ffvpn .ff-slider{position:absolute;inset:0;border-radius:30px;background:#94a3b8;cursor:pointer;transition:.2s}
+.ffvpn .ff-slider:before{position:absolute;content:'';height:22px;width:22px;left:4px;top:4px;background:#fff;border-radius:50%;transition:.2s}
+.ffvpn .ff-switch input:checked+.ff-slider{background:#4f46e5}
+.ffvpn .ff-switch input:checked+.ff-slider:before{transform:translateX(22px)}
+.ffvpn .ff-switch input:focus-visible+.ff-slider{outline:3px solid #38bdf8;outline-offset:3px}
+.ffvpn input,.ffvpn .ff-select{max-width:100%;padding:10px;margin:6px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--text)}
+.ffvpn .ff-details{white-space:pre-wrap;overflow-wrap:anywhere;max-height:400px;overflow:auto;background:var(--soft);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:14px;direction:ltr;text-align:left}
+.ffvpn .mk-footer{display:flex;flex-wrap:wrap;gap:12px;padding:22px 0;color:var(--muted);border-top:1px solid var(--line);margin-top:22px}
+.ffvpn .ff-signin-state{white-space:pre-wrap;margin:12px 0}
+.ffvpn .ff-action{display:inline-flex;flex-direction:column;align-items:stretch;gap:8px;max-width:100%;min-width:0;vertical-align:top}
+.ffvpn .ff-inline-note{font-size:12px;line-height:1.7;color:var(--zgz-success,#047857);white-space:normal;overflow-wrap:anywhere;text-align:start;max-width:420px}
+.ffvpn .ff-inline-note.ff-error{color:var(--zgz-error,#c43b42)}
+.ffvpn .ff-power{flex-wrap:wrap}
+.ffvpn .ff-power>.ff-inline-note{flex-basis:100%;max-width:none}
+.ffvpn .ff-setting-row{display:flex;align-items:center;flex-wrap:wrap;gap:14px;margin:16px 0}
+.ffvpn .ff-setting-row>label{min-width:110px;margin:0}
+.ffvpn .ff-setting-row select{min-width:220px;margin:0}
+.ffvpn .ff-connection-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:20px}
+.ffvpn .ff-setting-field{display:flex;flex-direction:row;align-items:center;gap:18px;min-width:0;margin:0;padding-block:8px}
+.ffvpn .ff-setting-field>span{flex:0 0 150px}
+.ffvpn .ff-setting-field select,.ffvpn .ff-setting-field input{width:100%;max-width:620px;box-sizing:border-box;min-height:44px;margin:0;flex:1}
+.ffvpn .ff-setting-field input[type=url]{direction:ltr;text-align:left}
+.ffvpn.mk-follow .ff-card,.ffvpn.mk-follow .ff-power{border-radius:var(--zgz-radius,6px);box-shadow:var(--zgz-card-shadow,none);background:var(--zgz-panel);color:var(--zgz-text);padding:var(--zgz-card-padding,20px);border-color:var(--line)}
+.ffvpn.mk-follow .mk-btn{border-radius:var(--zgz-action-radius,5px);padding:var(--zgz-button-padding,9px 16px);font-size:var(--zgz-button-size,14px);font-weight:var(--zgz-button-weight,500);line-height:var(--zgz-button-line-height,1.4);box-shadow:none;min-height:0}
+.ffvpn.mk-follow input:not([type=checkbox]),.ffvpn.mk-follow select,.ffvpn.mk-follow textarea{border-radius:var(--zgz-control-radius,5px);background:var(--zgz-control-bg,var(--zgz-panel));color:var(--zgz-text);border-color:var(--zgz-control-line,var(--line));font-family:var(--zgz-font,inherit)}
+.ffvpn.mk-follow .mk-hero .mk-language{color:var(--zgz-text);background:var(--zgz-control-bg,var(--zgz-panel));border:1px solid var(--zgz-control-line,var(--line))}
+.ffvpn .mk-btn.mk-small{padding:7px 11px;min-height:0;font-size:12px;line-height:1.2;gap:5px}
+.ffvpn .mk-btn.mk-small .ff-icon{width:15px;height:15px}
+.ffvpn:not(.mk-follow) .mk-btn.soft-blue{background:#e8f0ff;color:#2458d6;border-color:#cddcff}
+.ffvpn.mk-dark:not(.mk-follow) .mk-btn.soft-blue{background:#1e3a8a55;color:#93b4ff;border-color:#2c4c9c}
+.ffvpn:not(.mk-follow) .mk-btn.success{background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-color:transparent}
+.ffvpn:not(.mk-follow) .mk-btn.primary{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;border-color:transparent}
+.ffvpn.mk-follow .mk-btn.soft-blue{background:color-mix(in srgb,var(--zgz-accent) 12%,var(--panel));color:var(--zgz-accent-ink,var(--zgz-accent));border-color:transparent}
+.ffvpn.mk-follow .mk-btn.success{background:var(--success-surface,var(--zgz-success));color:var(--on-success-color,#fff);border-color:transparent}
+@media(max-width:700px){.ffvpn .ff-connection-grid{grid-template-columns:1fr;gap:18px}.ffvpn .ff-setting-field{flex-direction:column;align-items:stretch;gap:10px}.ffvpn .ff-setting-field>span{flex-basis:auto}.ffvpn .ff-tabs{gap:8px}.ffvpn .ff-tabs .mk-btn{flex:1 1 28%;white-space:normal}.ffvpn .mk-hero-controls{display:flex;flex-direction:column;align-items:stretch}.ffvpn .mk-seg{display:flex;flex-wrap:wrap}.ffvpn .mk-seg .mk-btn{flex:1;white-space:normal;min-width:0}.ffvpn .ff-form-row{align-items:stretch}.ffvpn .ff-form-row>label{flex-basis:100%}.ffvpn .ff-setting-row select{width:100%;min-width:0}.ffvpn .ff-setting-row .mk-btn{max-width:100%;white-space:normal}}
+@media(max-width:600px){.ffvpn{padding:10px}.ffvpn .mk-hero{padding:20px;flex-direction:column;align-items:stretch}.ffvpn .mk-hero h2{font-size:28px}.ffvpn .ff-grid{grid-template-columns:1fr}.ffvpn .ff-card input{display:block;width:100%;margin:8px 0}}

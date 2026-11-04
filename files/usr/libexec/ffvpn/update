@@ -1,0 +1,217 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+set -eu
+umask 077
+REPO=https://github.com/dreamboxone/ffvpn
+action=${1:-update}
+component=${2:-all}
+case "$action" in update|reinstall|check) ;; *) exit 2;; esac
+case "$component" in all) suffix='' ;; app|core) suffix=".$component";; *) exit 2;; esac
+ROOT=${FFVPN_ROOT:-}
+core_dir=/usr/bin
+if [ -z "$ROOT" ]; then core_dir=$(uci -q get ffvpn.main.core_dir || echo /usr/bin); fi
+case "$core_dir" in *..*|*[!a-zA-Z0-9_./-]*) echo 'Invalid core directory.' >&2; exit 1;; esac
+case "$core_dir" in /usr/*|/opt/*|/mnt/*|/overlay/*|/tmp/*) ;; *) exit 1;; esac
+destination() {
+	if [ "$1" = usr/bin/ffvpn-core ] && [ -z "$ROOT" ]; then printf '%s/ffvpn-core\n' "$core_dir"
+	else printf '%s/%s\n' "$ROOT" "$1"; fi
+}
+KEY=${FFVPN_KEY:-$ROOT/usr/share/ffvpn/release.pub}
+LOCK=${FFVPN_UPDATE_LOCK:-/var/lock/ffvpn-update}
+WORK=$(mktemp -d /tmp/ffvpn-update.XXXXXX)
+locked=0
+mutated=0
+success=0
+downloaded=0
+reused=0
+control_locked=0
+
+rollback() {
+	[ "$mutated" = 1 ] || return 0
+	while IFS= read -r path; do
+		if [ -f "$WORK/backup/$path" ]; then cp -p "$WORK/backup/$path" "$(destination "$path")"
+		else rm -f "$(destination "$path")"; fi
+	done < "$WORK/touched"
+}
+cleanup() {
+	if [ "$success" != 1 ]; then
+		[ "$mutated" != 1 ] || [ -n "$ROOT" ] || /etc/init.d/ffvpn stop || true
+		rollback
+		[ "$mutated" != 1 ] || [ -n "$ROOT" ] || /etc/init.d/ffvpn start || true
+	fi
+	rm -r "$WORK"
+	[ "$locked" != 1 ] || rmdir "$LOCK"
+	[ "$control_locked" != 1 ] || rmdir /var/lock/ffvpn-control
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+mkdir "$LOCK" 2>/dev/null || { echo 'Another update is in progress.' >&2; exit 1; }
+locked=1
+printf '%s\n%s\n' "$component" "$action" > /tmp/ffvpn-update.job
+
+fetch() {
+	case "$1" in https://*|http://127.0.0.1:* ) ;; *) echo 'Untrusted download address.' >&2; return 1;; esac
+	bytes=$(curl -fLsS --retry 2 --connect-timeout 15 --max-time 120 --max-filesize 2097152 -w '%{size_download}' "$1" -o "$2")
+	downloaded=$((downloaded + bytes))
+}
+safe_path() {
+	case "$1" in *..*|/*|*[!a-zA-Z0-9_./-]*) return 1;; esac
+	case "$1" in
+		usr/bin/ffvpn-core|etc/init.d/ffvpn|usr/libexec/ffvpn/*|usr/libexec/rpcd/luci.ffvpn|usr/share/ffvpn/*|usr/share/licenses/ffvpn/*|usr/share/luci/menu.d/luci-app-ffvpn.json|usr/share/rpcd/acl.d/luci-app-ffvpn.json|www/luci-static/resources/ffvpn/*|www/luci-static/resources/view/ffvpn/*) return 0;;
+	esac
+	return 1
+}
+verify() { printf '%s  %s\n' "$1" "$2" | sha256sum -c - >/dev/null 2>&1; }
+finish_file() {
+	[ -n "${path:-}" ] || return 0
+	[ "$(wc -c < "$WORK/new/$path" | tr -d ' ')" = "$size" ]
+	verify "$digest" "$WORK/new/$path"
+	chmod "$mode" "$WORK/new/$path"
+}
+
+if [ -n "${FFVPN_RELEASE_BASE:-}" ]; then
+	base=$FFVPN_RELEASE_BASE
+	arch=${FFVPN_ARCH:?}
+else
+	. /etc/openwrt_release
+	arch=$DISTRIB_ARCH
+	fetch https://api.github.com/repos/dreamboxone/ffvpn/releases/latest "$WORK/latest.json"
+	tag=$(jsonfilter -i "$WORK/latest.json" -e '@.tag_name')
+	case "$tag" in v[0-9]* ) ;; *) echo 'No published release.' >&2; exit 1;; esac
+	case "$tag" in *[!a-zA-Z0-9._-]*) exit 1;; esac
+	base="$REPO/releases/download/$tag"
+fi
+fetch "$base/$arch$suffix.manifest" "$WORK/manifest"
+fetch "$base/$arch$suffix.manifest.sig" "$WORK/manifest.sig"
+usign -V -p "$KEY" -m "$WORK/manifest" -x "$WORK/manifest.sig"
+read -r magic schema version manifest_arch < "$WORK/manifest"
+[ "$magic" = FFVPN ] && [ "$schema" = 1 ] && [ "$manifest_arch" = "$arch" ]
+case "$version" in ''|*[!0-9a-zA-Z._-]*) exit 1;; esac
+if [ "$action" = check ]; then
+	printf '%s\n' "$version" > "/tmp/ffvpn-update-$component.latest"
+	echo "$version"; success=1; exit 0
+fi
+mkdir -p "$WORK/new" "$WORK/reuse" "$WORK/backup"
+: > "$WORK/paths"
+: > "$WORK/changed-paths"
+: > "$WORK/touched"
+path='' skip=0 total=0
+while read -r kind a b c d extra; do
+	case "$kind" in
+		FFVPN) ;;
+		F)
+			finish_file
+			[ -z "${extra:-}" ] && safe_path "$d" || { echo 'Invalid release path.' >&2; exit 1; }
+			case "$a" in *[!0-9a-f]*|'') exit 1;; esac
+			[ "${#a}" = 64 ]
+			case "$b" in 644|755) ;; *) exit 1;; esac
+			case "$c" in ''|*[!0-9]*) exit 1;; esac
+			[ "$c" -le 67108864 ]
+			total=$((total + c)); [ "$total" -le 134217728 ]
+			path=$d digest=$a mode=$b size=$c
+			dest=$(destination "$path")
+			grep -Fxq "$path" "$WORK/paths" && exit 1
+			printf '%s\n' "$path" >> "$WORK/paths"
+			# Refuse symlinks anywhere along an installation path.
+			part=''
+			oldIFS=$IFS; IFS=/; set -- ${dest#/}; IFS=$oldIFS
+			for segment in "$@"; do part="$part/$segment"; [ ! -L "$part" ] || exit 1; done
+			mkdir -p "$WORK/new/${path%/*}"
+			: > "$WORK/new/$path"
+			skip=0
+			if [ -f "$dest" ]; then
+				if [ "$action" != reinstall ] && verify "$digest" "$dest"; then cp "$dest" "$WORK/new/$path"; skip=1; reused=$((reused + size))
+				else
+					index_core=$(destination usr/bin/ffvpn-core)
+					[ -x "$index_core" ] || index_core="$ROOT/usr/bin/ffvpn-core"
+					if [ -x "$index_core" ]; then
+						"$index_core" -chunk-file "$dest" -chunk-dir "$WORK/reuse"
+					fi
+				fi
+			fi
+			if [ "$skip" = 0 ]; then printf '%s\n' "$path" >> "$WORK/changed-paths"; fi
+			;;
+		B)
+			[ -n "$path" ] && [ -z "${c:-}${d:-}${extra:-}" ]
+			case "$a" in *[!0-9a-f]*|'') exit 1;; esac
+			[ "${#a}" = 64 ]
+			case "$b" in ''|*[!0-9]*) exit 1;; esac
+			[ "$b" -gt 0 ] && [ "$b" -le 1048576 ]
+			[ "$skip" = 0 ] || continue
+			if [ -f "$WORK/reuse/$a" ]; then source="$WORK/reuse/$a"; reused=$((reused + b))
+			else
+				fetch "$base/$a.gz" "$WORK/block.gz"
+				gzip -dc "$WORK/block.gz" | head -c 1048577 > "$WORK/block"
+				verify "$a" "$WORK/block"
+				source="$WORK/block"
+			fi
+			[ "$(wc -c < "$source" | tr -d ' ')" = "$b" ]
+			cat "$source" >> "$WORK/new/$path"
+			[ "$(wc -c < "$WORK/new/$path" | tr -d ' ')" -le "$size" ]
+			;;
+		*) echo 'Invalid manifest record.' >&2; exit 1;;
+	esac
+done < "$WORK/manifest"
+finish_file
+[ -s "$WORK/paths" ]
+: > "$WORK/obsolete"
+previous="$ROOT/usr/share/ffvpn/installed$suffix.manifest"
+if [ ! -f "$previous" ] && [ "$component" != all ]; then previous="$ROOT/usr/share/ffvpn/installed.manifest"; fi
+if [ -f "$previous" ]; then
+	awk '$1 == "F" {print $5}' "$previous" > "$WORK/previous-paths"
+	while IFS= read -r old; do
+		safe_path "$old" || exit 1
+		if [ "$component" = core ]; then
+			case "$old" in usr/bin/ffvpn-core|usr/share/ffvpn/core-version) ;; *) continue;; esac
+		elif [ "$component" = app ]; then
+			case "$old" in usr/bin/ffvpn-core|usr/share/ffvpn/core-version) continue;; esac
+		fi
+		if ! grep -Fxq "$old" "$WORK/paths"; then printf '%s\n' "$old" >> "$WORK/obsolete"; fi
+	done < "$WORK/previous-paths"
+fi
+cat "$WORK/changed-paths" "$WORK/obsolete" > "$WORK/all-paths"
+echo "Verified ffvpn $version. Installing changed files."
+if [ -s "$WORK/new/usr/bin/ffvpn-core" ]; then "$WORK/new/usr/bin/ffvpn-core" -version >/dev/null; fi
+# Preserve every prior file until the complete replacement succeeds.
+while IFS= read -r path; do
+	dest=$(destination "$path")
+	if [ -f "$dest" ]; then mkdir -p "$WORK/backup/${path%/*}"; cp -p "$dest" "$WORK/backup/$path"; fi
+done < "$WORK/all-paths"
+if [ -s "$WORK/all-paths" ]; then
+	if [ -z "$ROOT" ]; then
+		mkdir /var/lock/ffvpn-control 2>/dev/null || { echo 'A routing operation is in progress.' >&2; exit 1; }
+		control_locked=1
+		[ "$core_dir" = "$(uci -q get ffvpn.main.core_dir || echo /usr/bin)" ] || { echo 'Core directory changed; retry the update.' >&2; exit 1; }
+		uci -q get ffvpn.main.enabled > /tmp/ffvpn-power-target || echo 0 > /tmp/ffvpn-power-target
+		[ ! -x /etc/init.d/ffvpn ] || /etc/init.d/ffvpn stop
+	fi
+	mutated=1
+fi
+while IFS= read -r path; do
+	dest=$(destination "$path")
+	mkdir -p "${dest%/*}"
+	printf '%s\n' "$path" >> "$WORK/touched"
+	cp -p "$WORK/new/$path" "$dest.ffvpn-new"
+	mv "$dest.ffvpn-new" "$dest"
+done < "$WORK/changed-paths"
+while IFS= read -r path; do
+	printf '%s\n' "$path" >> "$WORK/touched"
+	rm -f "$(destination "$path")"
+done < "$WORK/obsolete"
+mkdir -p "$ROOT/usr/share/ffvpn"
+if [ -z "$ROOT" ] && [ "$mutated" = 1 ]; then
+	/etc/init.d/ffvpn start
+	/etc/init.d/rpcd restart
+	rm -f /tmp/luci-indexcache
+	/etc/init.d/uhttpd reload
+fi
+cp "$WORK/manifest" "$ROOT/usr/share/ffvpn/installed$suffix.manifest"
+if [ "$component" != core ]; then printf '%s\n' "$version" > "$ROOT/usr/share/ffvpn/version"; fi
+if [ "$component" = core ]; then printf '%s\n' "$version" > "$ROOT/usr/share/ffvpn/core-version"; fi
+cat "$WORK/paths" >> "$ROOT/usr/share/ffvpn/managed-files"
+sort -u "$ROOT/usr/share/ffvpn/managed-files" > "$WORK/managed-files"
+cp "$WORK/managed-files" "$ROOT/usr/share/ffvpn/managed-files"
+success=1
+printf '{"downloaded":%s,"reused":%s}\n' "$downloaded" "$reused" > /tmp/ffvpn-update.stats
+echo "Downloaded: $downloaded bytes; reused locally: $reused bytes."
+echo "ffvpn $version installed successfully."

@@ -1,0 +1,115 @@
+#!/bin/sh
+. /usr/share/libubox/jshn.sh
+reply_error() { json_init; json_add_string error "$1"; json_dump; }
+case "$1" in
+	list)
+		printf '%s\n' '{"status":{},"usage":{},"api":{"path":""},"api_write":{"method":"","path":"","body":""},"power":{"enabled":true,"confirmed":true},"mode":{"value":""},"directory":{"value":""},"clock":{},"update":{"component":"","action":""},"update_status":{}}'
+		;;
+	call)
+		read -r input
+		json_load "$input" || exit 1
+		case "$2" in
+			status)
+				json_init
+				json_add_boolean enabled "$(uci -q get ffvpn.main.enabled || echo 0)"
+				json_add_string integration "$(uci -q get ffvpn.main.integration || echo auto)"
+				json_add_string target "$(cat /etc/ffvpn/network-state/target 2>/dev/null)"
+				json_add_string version "$(cat /usr/share/ffvpn/version 2>/dev/null)"
+				busy=0; [ ! -d /var/lock/ffvpn-control ] || busy=1
+				json_add_boolean busy "$busy"
+				json_add_boolean desired "$(cat /tmp/ffvpn-power-target 2>/dev/null || echo 0)"
+				if [ "$(cat /tmp/ffvpn-control.result 2>/dev/null)" != 0 ] && [ -f /tmp/ffvpn-control.result ]; then
+					json_add_string control_error "$(tail -c 1000 /tmp/ffvpn-control.log 2>/dev/null)"
+				fi
+				board=$(ubus call system board 2>/dev/null)
+				info=$(ubus call system info 2>/dev/null)
+				json_add_object router
+				json_add_string model "$(jsonfilter -s "$board" -e '@.model')"
+				json_add_string version "$(jsonfilter -s "$board" -e '@.release.version')"
+				json_add_string architecture "$(sed -n "s/^DISTRIB_ARCH='\(.*\)'/\1/p" /etc/openwrt_release)"
+				json_add_string uptime "$(jsonfilter -s "$info" -e '@.uptime')"
+				json_add_string memory_total "$(jsonfilter -s "$info" -e '@.memory.total')"
+				json_add_string memory_free "$(jsonfilter -s "$info" -e '@.memory.available')"
+				json_add_string load "$(jsonfilter -s "$info" -e '@.load[0]')"
+				json_close_object
+				for p in zirgozar passwall2; do
+					json_add_object "$p"
+					installed=0; [ ! -x "/etc/init.d/$p" ] || installed=1
+					json_add_boolean installed "$installed"
+					if [ "$p" = zirgozar ]; then key=zirgozar.config.enabled; else key='passwall2.@global[0].enabled'; fi
+					json_add_boolean enabled "$(uci -q get "$key" || echo 0)"
+					running=0; /etc/init.d/"$p" running >/dev/null 2>&1 && running=1
+					json_add_boolean running "$running"
+					json_close_object
+				done
+				json_dump
+				;;
+			usage)
+				if [ -s /tmp/ffvpn-usage.json ] && jsonfilter -i /tmp/ffvpn-usage.json -e '@.days' >/dev/null 2>&1; then cat /tmp/ffvpn-usage.json
+				elif [ -s /etc/ffvpn/usage.json ] && jsonfilter -i /etc/ffvpn/usage.json -e '@.days' >/dev/null 2>&1; then cat /etc/ffvpn/usage.json
+				else echo '{"days":{}}'; fi
+				;;
+			api|api_write)
+				json_get_var path path
+				method=GET body='{}'
+				if [ "$2" = api_write ]; then json_get_var method method; json_get_var body body; fi
+				# GET and write methods have separate ubus ACL permissions.
+				case "$method" in GET|POST|PUT|DELETE) ;; *) reply_error 'Invalid method'; exit 0;; esac
+				result=$(printf '%s' "$body" | /usr/libexec/ffvpn/api "$method" "$path" 2>/dev/null) || { reply_error 'Core request failed; check the runtime log.'; exit 0; }
+				[ -n "$result" ] && printf '%s\n' "$result" || echo '{}'
+				;;
+			power)
+				json_get_var enabled enabled; json_get_var confirmed confirmed
+				if [ "$enabled" = 1 ]; then
+					[ "$confirmed" = 1 ] || { reply_error 'Confirm the routing changes first.'; exit 0; }
+					action=on
+				else action=off; fi
+				if [ -d /var/lock/ffvpn-control ]; then reply_error 'Another ffvpn operation is in progress.'
+				else /usr/libexec/ffvpn/control "$action" </dev/null >/tmp/ffvpn-control.log 2>&1 & echo '{"started":true}'; fi
+				;;
+			mode)
+				json_get_var value value
+				if result=$(/usr/libexec/ffvpn/control mode "$value" 2>&1); then echo '{"ok":true}'; else reply_error "$result"; fi
+				;;
+			directory)
+				json_get_var value value
+				if result=$(/usr/libexec/ffvpn/control directory "$value" 2>&1); then echo '{"ok":true}'; else reply_error "$result"; fi
+				;;
+			clock)
+				if result=$(/usr/libexec/ffvpn/control clock 2>&1); then echo '{"ok":true}'; else reply_error "$result"; fi
+				;;
+			update)
+				json_get_var component component; json_get_var action action
+				case "$component" in app|core|all) ;; *) reply_error 'Invalid component'; exit 0;; esac
+				case "$action" in check|update|reinstall) ;; *) reply_error 'Invalid update action'; exit 0;; esac
+				if [ -d /var/lock/ffvpn-update ]; then reply_error 'Update already in progress.'
+				else
+					if [ "$component:$action" = all:check ]; then
+						( /usr/libexec/ffvpn/update check app && /usr/libexec/ffvpn/update check core ) </dev/null >/tmp/ffvpn-update.log 2>&1 &
+					else /usr/libexec/ffvpn/update "$action" "$component" </dev/null >/tmp/ffvpn-update.log 2>&1 &
+					fi
+					echo '{"started":true}'
+				fi
+				;;
+			update_status)
+				json_init
+				json_add_string message "$(tail -c 4000 /tmp/ffvpn-update.log 2>/dev/null)"
+				busy=0; [ ! -d /var/lock/ffvpn-update ] || busy=1
+				json_add_boolean busy "$busy"
+				json_add_string component "$(sed -n '1p' /tmp/ffvpn-update.job 2>/dev/null)"
+				json_add_string action "$(sed -n '2p' /tmp/ffvpn-update.job 2>/dev/null)"
+				json_add_string app_version "$(cat /usr/share/ffvpn/version 2>/dev/null)"
+				json_add_string core_version "$(cat /usr/share/ffvpn/core-version 2>/dev/null)"
+				json_add_string app_latest "$(cat /tmp/ffvpn-update-app.latest 2>/dev/null)"
+				json_add_string core_latest "$(cat /tmp/ffvpn-update-core.latest 2>/dev/null)"
+				directory=$(uci -q get ffvpn.main.core_dir || echo /usr/bin)
+				json_add_string core_dir "$directory"
+				core="$directory/ffvpn-core"; [ -x "$core" ] || core=/usr/bin/ffvpn-core
+				json_add_string core_path "$core"
+				json_add_string free_kb "$(df -Pk /overlay | awk 'NR==2 {print $4}')"
+				json_dump
+				;;
+			*) reply_error 'Unknown method';;
+		esac
+		;;
+esac
