@@ -25,7 +25,7 @@ An unofficial client for Firefox's built-in VPN on OpenWrt, with an integrated L
 
 ## Installation
 
-Targets OpenWrt 23.05, 24.10 and 25.12. Hardware testing currently uses Google WiFi on 25.12.6; other releases require separate verification. LuCI is required; Zirgozar or PassWall2 is optional for whole-network routing.
+Targets OpenWrt 23.05, 24.10 and 25.12. LuCI is required; Zirgozar or PassWall2 is optional for whole-network routing.
 
 Run on the router over SSH:
 

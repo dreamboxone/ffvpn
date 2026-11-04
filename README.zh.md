@@ -25,7 +25,7 @@
 
 ## 安装
 
-目标版本为 OpenWrt 23.05、24.10 和 25.12。目前使用 Google WiFi 上的 25.12.6 进行实机测试；其他版本仍需单独验证。需要 LuCI；全网路由才需要 Zirgozar 或 PassWall2。
+目标版本为 OpenWrt 23.05、24.10 和 25.12。需要 LuCI；全网路由才需要 Zirgozar 或 PassWall2。
 
 通过 SSH 执行：
 
