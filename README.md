@@ -4,7 +4,7 @@
 
 <p align="center"><img src="https://github.com/dreamboxone/ffvpn/releases/latest/download/logo.png" alt="ffvpn" width="200"></p>
 
-کلاینت غیررسمی سرویس VPN داخلی Firefox برای روتر OpenWrt، با رابط یکپارچه LuCI.
+فیلترشکن داخلی Firefox طراحی شده برای روتر OpenWrt با رابط کاربری یکپارچه
 
 [![نسخه](https://img.shields.io/github/v/release/dreamboxone/ffvpn?style=for-the-badge)](https://github.com/dreamboxone/ffvpn/releases/latest)
 [![دانلود](https://img.shields.io/github/downloads/dreamboxone/ffvpn/total?style=for-the-badge)](https://github.com/dreamboxone/ffvpn/releases)
