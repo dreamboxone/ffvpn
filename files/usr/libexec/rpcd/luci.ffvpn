@@ -98,6 +98,7 @@ case "$1" in
 				json_add_boolean busy "$busy"
 				json_add_string component "$(sed -n '1p' /tmp/ffvpn-update.job 2>/dev/null)"
 				json_add_string action "$(sed -n '2p' /tmp/ffvpn-update.job 2>/dev/null)"
+				json_add_string result "$(cat /tmp/ffvpn-update.result 2>/dev/null)"
 				json_add_string app_version "$(cat /usr/share/ffvpn/version 2>/dev/null)"
 				json_add_string core_version "$(cat /usr/share/ffvpn/core-version 2>/dev/null)"
 				json_add_string app_latest "$(cat /tmp/ffvpn-update-app.latest 2>/dev/null)"

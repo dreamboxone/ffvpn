@@ -143,6 +143,7 @@ return view.extend({
      root.querySelectorAll('[data-update]').forEach(function(b){
       var active=busy&&((r.component||updatePending&&updatePending.component)===b.dataset.update)&&((r.action||updatePending&&updatePending.action)===b.dataset.action);
       b.ffBusy=busy;b.disabled=busy;b.classList.toggle('mk-running',!!active);
+      if(r.component===b.dataset.update&&r.action===b.dataset.action&&r.message){var failed=!busy&&r.result&&r.result!=='0';note(busy?t(r.action==='check'?'Checking version':'Updating files'):failed?t('The operation failed. Check the router connection and try again.'):t(r.action==='check'?'Version check complete':'Update complete'),!!failed,b);}
      });
      if(updateVersions.space){var gb=Number(r.free_kb)*1024/1000000000;updateVersions.space.textContent=t('Free space')+': '+(Number.isFinite(gb)?gb.toLocaleString(i18n.get(),{maximumFractionDigits:2}):'—')+' '+t('GB');}
      if(updateVersions.path)updateVersions.path.textContent=r.core_path||'/usr/bin/ffvpn-core';
@@ -237,7 +238,7 @@ return view.extend({
     ]));content.appendChild(locations);
     return callAPI('/locations').then(checked).then(function(r){(r.locations||[]).forEach(function(l){var c=card(countryName(l.code,l.name),[E('p',{},cityName(l.city,l.code)),E('p',{},l.ping_ms?l.ping_ms+' ms':l.ping_error||''),button('Select',function(){return write('/location',{country:l.code}).then(status);})]);c.querySelector('h3').prepend(flag(l.code,countryName(l.code,l.name)));locations.appendChild(c);});});
    }else if(tab==='Updates'){
-    updateText=E('pre',{'class':'ff-details'});
+    updateText=E('pre',{'class':'ff-details',style:'display:none'});
     function updateButton(label,component,action){var b=button(label,function(){
      if(action!=='check'&&!window.confirm(t('Start the update? The connection may briefly stop.')))return;
      updatePending={component:component,action:action,time:Date.now()};

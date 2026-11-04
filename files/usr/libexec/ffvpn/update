@@ -34,6 +34,8 @@ rollback() {
 	done < "$WORK/touched"
 }
 cleanup() {
+	result=$?
+	printf '%s\n' "$result" > /tmp/ffvpn-update.result
 	if [ "$success" != 1 ]; then
 		[ "$mutated" != 1 ] || [ -n "$ROOT" ] || /etc/init.d/ffvpn stop || true
 		rollback
