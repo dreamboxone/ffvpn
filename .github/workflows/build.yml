@@ -1,6 +1,17 @@
 name: Build OpenWrt releases
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish signed release after successful builds
+        type: boolean
+        default: false
+  push:
+    tags:
+      - 'v*'
+concurrency:
+  group: ffvpn-release-${{ github.ref }}
+  cancel-in-progress: false
 permissions:
   contents: read
 jobs:
@@ -76,3 +87,52 @@ jobs:
             dist/release/*.gz
           if-no-files-found: error
           retention-days: 14
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.publish == true
+    needs: [test, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ffvpn-*
+          merge-multiple: true
+          path: dist/release
+      - name: Build pinned signature tool
+        run: |
+          git clone https://git.openwrt.org/project/usign.git "$RUNNER_TEMP/usign"
+          git -C "$RUNNER_TEMP/usign" checkout c4c72b1b07945ee192361dc751291a7c98d6adcd
+          cmake -S "$RUNNER_TEMP/usign" -B "$RUNNER_TEMP/usign/build"
+          cmake --build "$RUNNER_TEMP/usign/build" --parallel 2
+      - name: Verify and sign release assets
+        env:
+          SIGNING_KEY_B64: ${{ secrets.FFVPN_RELEASE_SIGNING_KEY_B64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SIGNING_KEY_B64" || { echo 'Release signing secret is missing'; exit 1; }
+          umask 077
+          key="$RUNNER_TEMP/ffvpn-release.key"
+          trap 'rm -f "$key"' EXIT
+          printf '%s' "$SIGNING_KEY_B64" | base64 --decode > "$key"
+          python3 build/publish.py --assets dist/release --usign "$RUNNER_TEMP/usign/build/usign" --key "$key"
+      - name: Publish release on GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v$(cat VERSION)"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            test "${GITHUB_REF#refs/tags/}" = "$tag"
+          fi
+          if gh release view "$tag" >/dev/null 2>&1; then
+            test "$(gh release view "$tag" --json isDraft --jq .isDraft)" = true || { echo 'Release already published; use a new version'; exit 1; }
+          else
+            gh release create "$tag" --target "$GITHUB_SHA" --title "ffvpn $(cat VERSION)" --notes-file docs/RELEASE.md --draft
+          fi
+          gh release upload "$tag" dist/release/* --clobber
+          gh release edit "$tag" --notes-file docs/RELEASE.md --draft=false --latest
