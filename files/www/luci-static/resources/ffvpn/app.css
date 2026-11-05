@@ -101,6 +101,13 @@
 .ffvpn .ff-setting-field>span{flex:0 0 150px}
 .ffvpn .ff-setting-field select,.ffvpn .ff-setting-field input{width:100%;max-width:620px;box-sizing:border-box;min-height:44px;margin:0;flex:1}
 .ffvpn .ff-setting-field input[type=url]{direction:ltr;text-align:left}
+.ffvpn .ff-setting-title{display:flex;align-items:baseline;gap:4px;min-width:0}
+.ffvpn .ff-setting-title>label{margin:0;white-space:nowrap;font:inherit;color:inherit}
+.ffvpn .ff-option-help{position:relative;top:-.4em;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;min-height:0;padding:0;margin:0;border:1px solid var(--line);border-radius:50%;background:var(--soft);color:var(--accent,#3b82f6);cursor:pointer;font:700 11px/1 Arial,sans-serif;box-shadow:none}
+.ffvpn[dir=rtl] .ff-option-help{top:-.55em;width:18px;height:18px;font-size:13px;font-weight:900;text-shadow:0 0 .35px currentColor}
+.ffvpn .ff-option-help:focus-visible{outline:2px solid var(--accent,#3b82f6);outline-offset:3px}
+.ffvpn .ff-help-content{position:fixed;inset:auto;margin:0;box-sizing:border-box;width:380px;max-width:calc(100vw - 32px);max-height:50vh;overflow:auto;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text);box-shadow:var(--shadow);font-size:13px;font-weight:400;line-height:1.9;white-space:normal;overflow-wrap:anywhere;text-align:start}
+.ffvpn .ff-help-content p{margin:8px 0}.ffvpn .ff-help-content ul{padding-inline-start:20px;margin:8px 0}.ffvpn .ff-help-content li{margin:5px 0}
 .ffvpn.mk-follow .ff-card,.ffvpn.mk-follow .ff-power{border-radius:var(--zgz-radius,6px);box-shadow:var(--zgz-card-shadow,none);background:var(--zgz-panel);color:var(--zgz-text);padding:var(--zgz-card-padding,20px);border-color:var(--line)}
 .ffvpn.mk-follow .mk-btn{border-radius:var(--zgz-action-radius,5px);padding:var(--zgz-button-padding,9px 16px);font-size:var(--zgz-button-size,14px);font-weight:var(--zgz-button-weight,500);line-height:var(--zgz-button-line-height,1.4);box-shadow:none;min-height:0}
 .ffvpn.mk-follow input:not([type=checkbox]),.ffvpn.mk-follow select,.ffvpn.mk-follow textarea{border-radius:var(--zgz-control-radius,5px);background:var(--zgz-control-bg,var(--zgz-panel));color:var(--zgz-text);border-color:var(--zgz-control-line,var(--line));font-family:var(--zgz-font,inherit)}

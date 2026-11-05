@@ -1,6 +1,15 @@
 'use strict';
 'require baseclass';
 var words = {
+ 'TLS fragmentation help': ['راهنمای فرگمنت TLS','TLS 分片帮助','Справка о фрагментации TLS'],
+ 'TLS fragmentation splits the initial TLS handshake (ClientHello). It may help when a network filter inspects the server name.': ['فرگمنت TLS پیام اولیه اتصال امن (ClientHello) را تکه‌تکه می‌کند. اگر فیلتر شبکه نام سرور را بررسی کند، این روش ممکن است به برقراری اتصال کمک کند.','TLS 分片会拆分初始握手消息（ClientHello）。当网络过滤器检查服务器名称时，这可能有助于建立连接。','Фрагментация TLS разделяет начальное сообщение ClientHello. Это может помочь, если сетевой фильтр проверяет имя сервера.'],
+ 'Sends the initial TLS message normally.': ['پیام اولیه TLS را به شکل معمول ارسال می‌کند.','正常发送初始 TLS 消息。','Отправляет начальное сообщение TLS обычным способом.'],
+ 'Uses three writes: before the domain name, its first letter, and the rest of the message.': ['پیام را در سه ارسال می‌فرستد: بخش قبل از نام دامنه، اولین حرف دامنه و ادامه پیام.','分三次写入：域名前的部分、域名的首字母，以及消息的剩余部分。','Записывает сообщение тремя частями: до имени домена, его первая буква и оставшаяся часть сообщения.'],
+ 'Sends the first byte separately, then sends the rest of the message.': ['اولین بایت پیام را جدا می‌فرستد و سپس باقی پیام را ارسال می‌کند.','单独发送第一个字节，然后发送消息的剩余部分。','Отправляет первый байт отдельно, затем оставшуюся часть сообщения.'],
+ 'Splits the message into two TLS records after the first letter of the domain name.': ['پیام را به دو رکورد TLS تقسیم می‌کند؛ مرز تقسیم بعد از اولین حرف نام دامنه است.','在域名首字母之后将消息拆成两条 TLS 记录。','Разделяет сообщение на две записи TLS после первой буквы имени домена.'],
+ 'The domain name is not changed or encrypted. Separate TCP writes may be combined by the network; bypass is not guaranteed.': ['نام دامنه عوض یا رمزگذاری نمی‌شود. شبکه ممکن است ارسال‌های جداگانه TCP را دوباره ترکیب کند؛ عبور از فیلتر تضمینی نیست.','域名不会被更改或加密。网络可能合并单独的 TCP 写入；不保证绕过过滤。','Имя домена не меняется и не шифруется. Сеть может объединить отдельные записи TCP; обход фильтра не гарантируется.'],
+ 'This cannot fix a blocked IP or port, or a TCP connection that never opens. It does not fragment the main HTTP/3 connection, which uses QUIC.': ['اگر IP یا پورت مسدود باشد، یا اتصال TCP از ابتدا برقرار نشود، فرگمنت کمکی نمی‌کند. اتصال اصلی HTTP/3 از QUIC استفاده می‌کند و با این روش تکه‌تکه نمی‌شود.','此功能无法解决 IP 或端口被封锁、或 TCP 无法建立连接的问题。HTTP/3 主连接使用 QUIC，不会通过此方法分片。','Не помогает при блокировке IP или порта либо невозможности установить TCP-соединение. Основное соединение HTTP/3 использует QUIC и этим способом не фрагментируется.'],
+ 'Keep this off if your connection is stable. Changes affect new connections.': ['اگر اتصال پایدار است، روی خاموش بماند. تغییر این گزینه روی اتصال‌های جدید اعمال می‌شود.','如果连接稳定，请保持关闭。更改仅对新连接生效。','Если соединение стабильно, оставьте выключенным. Изменения применяются к новым соединениям.'],
  'Show email': ['نمایش ایمیل','显示邮箱','Показать адрес'],
  'Hide email': ['مخفی کردن ایمیل','隐藏邮箱','Скрыть адрес'],
  'Days': ['روز','天','дн.'],

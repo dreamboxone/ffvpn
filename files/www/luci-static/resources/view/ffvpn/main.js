@@ -61,6 +61,26 @@ function homeCard(title,ico,accent,children){return E('section',{'class':'mk-car
 function formatGB(value){return (Math.max(0,Number(value)||0)/1000000000).toLocaleString(i18n.get(),{minimumFractionDigits:2,maximumFractionDigits:2});}
 function accountDate(value){if(!value||!Number.isFinite(Date.parse(value)))return t('Not recorded');return new Intl.DateTimeFormat(i18n.get()==='fa'?'fa-IR-u-ca-persian':i18n.get()+'-u-ca-gregory',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value));}
 function formatLatency(value){var fa=i18n.get()==='fa';return E('span',{'class':'ff-latency',dir:fa?'rtl':'ltr'},[E('bdi',{dir:'ltr'},Number(value).toLocaleString(i18n.get(),{maximumFractionDigits:0})),E('span',{},fa?'م‌ثانیه':'ms')]);}
+function fragmentationHelp(){
+ var title=t('TLS fragmentation help'),id='ff-fragmentation-help';
+ var trigger=E('button',{type:'button','class':'ff-option-help',popovertarget:id,'aria-label':title,'aria-expanded':'false'},i18n.get()==='fa'?'؟':'?');
+ var popup=E('div',{id:id,'class':'ff-help-content',popover:'auto',role:'dialog','aria-label':title,dir:i18n.get()==='fa'?'rtl':'ltr'},[
+  E('strong',{},title),
+  E('p',{},t('TLS fragmentation splits the initial TLS handshake (ClientHello). It may help when a network filter inspects the server name.')),
+  E('ul',{},[
+   E('li',{},[E('strong',{},t('Off')+': '),t('Sends the initial TLS message normally.')]),
+   E('li',{},[E('strong',{},'SNI: '),t('Uses three writes: before the domain name, its first letter, and the rest of the message.')]),
+   E('li',{},[E('strong',{},'First byte: '),t('Sends the first byte separately, then sends the rest of the message.')]),
+   E('li',{},[E('strong',{},'TLS record: '),t('Splits the message into two TLS records after the first letter of the domain name.')])
+  ]),
+  E('p',{},t('The domain name is not changed or encrypted. Separate TCP writes may be combined by the network; bypass is not guaranteed.')),
+  E('p',{},t('This cannot fix a blocked IP or port, or a TCP connection that never opens. It does not fragment the main HTTP/3 connection, which uses QUIC.')),
+  E('p',{},t('Keep this off if your connection is stable. Changes affect new connections.'))
+ ]);
+ function position(){var anchor=trigger.getBoundingClientRect(),box=popup.getBoundingClientRect();popup.style.left=Math.max(16,Math.min(i18n.get()==='fa'?anchor.right-box.width:anchor.left,window.innerWidth-box.width-16))+'px';popup.style.top=Math.max(16,anchor.bottom+8+box.height<=window.innerHeight-16?anchor.bottom+8:anchor.top-box.height-8)+'px';}
+ popup.addEventListener('toggle',function(event){var open=event.newState==='open';trigger.setAttribute('aria-expanded',String(open));if(open){position();window.addEventListener('resize',position);document.addEventListener('scroll',position,true);}else{window.removeEventListener('resize',position);document.removeEventListener('scroll',position,true);}});
+ return E('span',{'class':'ff-setting-title'},[E('label',{'for':'ff-fragmentation'},t('TLS fragmentation')),trigger,popup]);
+}
 function formatKB(value){return (Math.max(0,Number(value)||0)/1024).toLocaleString(i18n.get(),{maximumFractionDigits:2});}
 function uptime(seconds){var n=Math.max(0,Math.floor(Number(seconds)||0));return String(Math.floor(n/3600)).padStart(2,'0')+':'+String(Math.floor(n/60)%60).padStart(2,'0')+':'+String(n%60).padStart(2,'0');}
 function countryName(code,fallback){
@@ -271,7 +291,7 @@ return view.extend({
      var relay=E('input',{type:'url',value:r.config.network.api_relay||'',placeholder:'https://',change:function(){change('network','api_relay',relay.value);}});
      connection.appendChild(E('div',{'class':'ff-connection-grid'},[
       E('label',{'class':'ff-setting-field'},[E('span',{},t('Connection protocol')),select([['h2','HTTP/2'],['h3','HTTP/3']],r.config.proxy.transport,function(v){change('proxy','transport',v);})]),
-      E('label',{'class':'ff-setting-field'},[E('span',{},t('TLS fragmentation')),select([['off','Off'],['sni','SNI'],['first-byte','First byte'],['record','TLS record']],r.config.network.hello_split||'off',function(v){change('network','hello_split',v);})]),
+      E('div',{'class':'ff-setting-field'},[fragmentationHelp(),(function(){var field=select([['off','Off'],['sni','SNI'],['first-byte','First byte'],['record','TLS record']],r.config.network.hello_split||'off',function(v){change('network','hello_split',v);});field.id='ff-fragmentation';return field;})()]),
       E('label',{'class':'ff-setting-field'},[E('span',{},t('Relay server')),relay])
      ]));
      var clock=button('Set router clock',function(anchor){return callClock(Math.floor(Date.now()/1000)).then(checked).then(function(r){note(t(r.already?'Router clock is already configured.':'Router clock configured'),false,anchor);});});clock.classList.add('primary');clock.prepend(icon('Updates'));connection.appendChild(E('div',{'class':'ff-setting-row ff-clock-row'},[clock]));
