@@ -135,7 +135,6 @@ var words = {
  'Router clock configured': ['ساعت روتر تنظیم شد','路由器时间已配置','Часы маршрутизатора настроены'],
  'Whole-network routing requires PassWall2 or Zirgozar.': ['مسیریابی کل شبکه به PassWall2 یا زیرگذر نیاز دارد.','全网络路由需要 PassWall2 或 Zirgozar。','Для маршрутизации всей сети требуется PassWall2 или Zirgozar.'],
  'Unofficial client. Not affiliated with Mozilla.': ['کلاینت غیررسمی؛ بدون وابستگی به موزیلا.','非官方客户端，与 Mozilla 无关联。','Неофициальный клиент. Не связан с Mozilla.'],
- 'TCP is limited to ports 80, 443, 8080 and 8443. UDP availability depends on the destination port.': ['TCP به پورت‌های ۸۰، ۴۴۳، ۸۰۸۰ و ۸۴۴۳ محدود است. دسترسی UDP به پورت مقصد بستگی دارد.','TCP 仅支持 80、443、8080 和 8443 端口。UDP 可用性取决于目标端口。','TCP ограничен портами 80, 443, 8080 и 8443. Доступность UDP зависит от порта назначения.'],
  'Website': ['وب‌سایت','网站','Сайт'],
  'Source code': ['کد منبع','源代码','Исходный код'],
  'Support': ['پشتیبانی','支持','Поддержка'],

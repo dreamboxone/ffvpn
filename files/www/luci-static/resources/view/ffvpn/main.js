@@ -327,7 +327,7 @@ return view.extend({
      integrationPending=true;
      return callIntegration(enabled,integrationTarget.value,true).then(checked).then(function(){note(t('Applying settings'),false,anchor);return status();}).finally(function(){integrationPending=false;});
     });integrationButton.classList.add('primary');
-    var basic=card('Basic settings',[masterCard,engines,E('div',{'class':'ff-actions'},available.length?[integrationTarget,integrationButton]:[E('p',{},t('Whole-network routing requires PassWall2 or Zirgozar.'))]),E('p',{},t('Whole-network routing requires PassWall2 or Zirgozar.')),E('p',{},t('TCP is limited to ports 80, 443, 8080 and 8443. UDP availability depends on the destination port.'))]);content.appendChild(basic);baseOptions(basic).catch(function(e){note(e.message,true,basic);});
+    var basic=card('Basic settings',[masterCard,engines,E('div',{'class':'ff-actions'},available.length?[integrationTarget,integrationButton]:[E('p',{},t('Whole-network routing requires PassWall2 or Zirgozar.'))]),E('p',{},t('Whole-network routing requires PassWall2 or Zirgozar.'))]);content.appendChild(basic);baseOptions(basic).catch(function(e){note(e.message,true,basic);});
    }else if(tab==='Accounts'){
     content.appendChild(E('p',{},t('Multiple Mozilla accounts are supported. Accounts are tried in priority order when quota runs low.')));
     accountBox=E('div');var addForm=signinForm();addForm.hidden=!signup;var addButton=button('Add user',function(){addForm.hidden=false;addForm.querySelector('input').focus();});addButton.classList.add('primary');content.appendChild(addButton);content.appendChild(accountBox);content.appendChild(addForm);
