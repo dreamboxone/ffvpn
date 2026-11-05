@@ -8,6 +8,7 @@ import pathlib
 import shutil
 import subprocess
 import sys
+import tarfile
 
 p = argparse.ArgumentParser()
 p.add_argument('--assets', type=pathlib.Path, required=True)
@@ -18,34 +19,26 @@ a = p.parse_args()
 version = pathlib.Path('VERSION').read_text().strip()
 core_version = pathlib.Path('CORE_VERSION').read_text().strip()
 architectures = json.loads(pathlib.Path('build/architectures.json').read_text())
-expected = {arch + suffix + '.manifest' for arch in architectures for suffix in ('', '.app', '.core')}
+expected = {arch + suffix + '.manifest' for arch in architectures for suffix in ('',)}
 assert {m.name for m in a.assets.glob('*.manifest')} == expected, 'Architecture manifest set differs'
 for name in sorted(expected):
     manifest = a.assets / name
     lines = manifest.read_text().splitlines()
-    expected_version = core_version if '.core.manifest' in name else version
-    assert lines[0] == 'FFVPN 1 ' + expected_version + ' ' + name.split('.')[0]
-    current = None
-    data = bytearray()
-
-    def verify_file():
-        if current:
-            assert len(data) == int(current[3]), 'File size mismatch: ' + current[4]
-            assert hashlib.sha256(data).hexdigest() == current[1], 'File hash mismatch: ' + current[4]
-
-    for line in lines[1:]:
-        fields = line.split()
-        if fields[0] == 'F':
-            verify_file()
-            current, data = fields, bytearray()
-        elif fields[0] == 'B':
-            block = gzip.decompress((a.assets / (fields[1] + '.gz')).read_bytes())
-            assert len(block) == int(fields[2])
-            assert hashlib.sha256(block).hexdigest() == fields[1]
-            data.extend(block)
-        else:
-            raise ValueError('Unknown manifest record')
-    verify_file()
+    assert lines[0] == 'FFVPN 2 ' + version + ' ' + name.split('.')[0] + ' ' + core_version
+    fields = lines[1].split()
+    assert fields[0] == 'A' and pathlib.Path(fields[3]).name == fields[3]
+    archive = a.assets / fields[3]
+    assert archive.stat().st_size == int(fields[2])
+    assert hashlib.sha256(archive.read_bytes()).hexdigest() == fields[1]
+    with tarfile.open(archive, 'r:gz') as tar:
+        for line in lines[2:]:
+            fields = line.split()
+            assert fields[0] == 'F'
+            member = tar.getmember(fields[4])
+            assert member.isfile()
+            data = tar.extractfile(member).read()
+            assert len(data) == int(fields[3])
+            assert hashlib.sha256(data).hexdigest() == fields[1]
     signature = str(manifest) + '.sig'
     subprocess.run([a.usign, '-S', '-m', str(manifest), '-s', str(a.key), '-x', signature], check=True)
     subprocess.run([a.usign, '-V', '-m', str(manifest), '-p', 'files/usr/share/ffvpn/release.pub', '-x', signature], check=True)

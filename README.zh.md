@@ -20,7 +20,7 @@
 - 开关和设置即时生效，无需 Save & Apply。
 - 检测 Zirgozar 和 PassWall2；更改路由前提示，关闭时恢复本程序修改的设置，并保留之后的手动编辑。
 - 分别检查、更新或重新安装应用和核心，显示核心路径与可用空间。
-- 验证发布签名与 SHA-256，只下载更改的文件和二进制块。
+- 下载完整版本归档，并验证签名与 SHA-256。
 - 与 Zirgozar 相同的德黑兰时区和伊朗时间服务器设置。
 
 ## 安装
@@ -49,7 +49,7 @@ wget -qO /tmp/ffvpn-install.sh https://raw.githubusercontent.com/dreamboxone/ffv
 
 ## 核心与限制
 
-核心基于 [arman-vpn-client](https://github.com/armanlife/arman-vpn-client)，增加了 OpenWrt 入口。Mozilla 管理服务端；兼容核心通过 ffvpn 发布。差分下载量取决于实际二进制变化，首次安装需要完整下载。
+核心基于 [arman-vpn-client](https://github.com/armanlife/arman-vpn-client)，增加了 OpenWrt 入口。Mozilla 管理服务端；兼容核心通过 ffvpn 发布。更新下载完整版本归档，并在安装前验证签名和文件哈希。
 
 本项目与 Mozilla 无关联，也未经其认可。配额和可用性由 Mozilla 决定。TCP 仅支持 80、443、8080、8443 端口，UDP 也受端口限制，部分通话、游戏和 SSH 可能无法使用。管理 API 仅监听回环地址，SOCKS 仅允许 LAN 访问，阻止 WAN 访问。
 

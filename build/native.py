@@ -68,32 +68,25 @@ for arch in json.loads(pathlib.Path('build/architectures.json').read_text()):
         root.mkdir()
         manifest = a.assets / (arch + '.manifest')
         lines = manifest.read_text().splitlines()
-        current = None
-        data = bytearray()
+        archive_record = lines[1].split()
+        archive = a.assets / archive_record[3]
+        assert hashlib.sha256(archive.read_bytes()).hexdigest() == archive_record[1]
         managed = []
-
-        def finish():
-            if current:
-                assert len(data) == int(current[3])
-                assert hashlib.sha256(data).hexdigest() == current[1]
-                name = pathlib.PurePosixPath(current[4])
+        with tarfile.open(archive, 'r:gz') as tar:
+            for line in lines[2:]:
+                fields = line.split()
+                assert fields[0] == 'F'
+                name = pathlib.PurePosixPath(fields[4])
                 assert not name.is_absolute() and '..' not in name.parts
+                member = tar.getmember(name.as_posix())
+                assert member.isfile()
+                data = tar.extractfile(member).read()
+                assert len(data) == int(fields[3]) and hashlib.sha256(data).hexdigest() == fields[1]
                 dest = root / name
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.write_bytes(data)
-                dest.chmod(int(current[2], 8))
+                dest.chmod(int(fields[2], 8))
                 managed.append(name.as_posix())
-
-        for line in lines[1:]:
-            fields = line.split()
-            if fields[0] == 'F':
-                finish()
-                current, data = fields, bytearray()
-            elif fields[0] == 'B':
-                block = gzip.decompress((a.assets / (fields[1] + '.gz')).read_bytes())
-                assert hashlib.sha256(block).hexdigest() == fields[1]
-                data.extend(block)
-        finish()
         (root / 'etc/config').mkdir(parents=True, exist_ok=True)
         shutil.copyfile('files/etc/config/ffvpn', root / 'etc/config/ffvpn')
         metadata = root / 'usr/share/ffvpn'

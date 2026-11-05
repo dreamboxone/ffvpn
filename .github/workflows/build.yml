@@ -28,10 +28,6 @@ jobs:
       - name: Test core behavior
         working-directory: core
         run: go test ./cmd/ffvpn ./internal/service ./internal/proxy ./internal/accounts ./internal/config ./internal/fxa
-      - name: Test differential block compatibility
-        run: |
-          sh build/core.sh x86_64 dist/ffvpn-core
-          python3 test/chunks.py dist/ffvpn-core
   build:
     needs: test
     runs-on: ubuntu-24.04
@@ -84,7 +80,7 @@ jobs:
           name: ffvpn-${{ matrix.family }}
           path: |
             dist/release/*.manifest
-            dist/release/*.gz
+            dist/release/*.tar.gz
           if-no-files-found: error
           retention-days: 14
   publish:

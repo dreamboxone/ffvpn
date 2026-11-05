@@ -188,6 +188,7 @@ words["The secure connection to Mozilla timed out. Check the router internet con
 words["Mozilla did not respond in time. Check the router connection and try again."]=["موزیلا در مهلت مقرر پاسخ نداد. اتصال روتر را بررسی و دوباره تلاش کنید.", "Mozilla 未及时响应。请检查路由器连接后重试。", "Mozilla не ответила вовремя. Проверьте соединение роутера и повторите попытку."];
 words["The Mozilla server address could not be resolved. Check router DNS settings."]=["نشانی سرور موزیلا پیدا نشد. تنظیمات DNS روتر را بررسی کنید.", "无法解析 Mozilla 地址。请检查路由器 DNS。", "Не удалось определить адрес Mozilla. Проверьте DNS роутера."];
 words["Cannot connect to Mozilla. Check the router internet connection."]=["اتصال به موزیلا ممکن نیست. اینترنت روتر را بررسی کنید.", "无法连接 Mozilla。请检查路由器网络。", "Не удалось подключиться к Mozilla. Проверьте интернет роутера."];
+words['The complete release archive is downloaded and verified before installation.']=['فایل کامل نسخه دریافت و پیش از نصب بررسی می شود.','下载完整版本归档并在安装前验证。','Полный архив версии загружается и проверяется перед установкой.'];
 var language = 'fa';
 try { language = localStorage.getItem('ffvpn-language') || 'fa'; } catch(e) {}
 if (['en','fa','zh','ru'].indexOf(language) < 0) language = 'fa';

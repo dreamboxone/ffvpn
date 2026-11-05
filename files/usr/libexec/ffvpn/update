@@ -53,7 +53,7 @@ printf '%s\n%s\n' "$component" "$action" > /tmp/ffvpn-update.job
 
 fetch() {
 	case "$1" in https://*|http://127.0.0.1:* ) ;; *) echo 'Untrusted download address.' >&2; return 1;; esac
-	bytes=$(curl -fLsS --retry 2 --connect-timeout 15 --max-time 120 --max-filesize 2097152 -w '%{size_download}' "$1" -o "$2")
+	bytes=$(curl -fLsS --retry 2 --connect-timeout 15 --max-time 120 --max-filesize 134217728 -w '%{size_download}' "$1" -o "$2")
 	downloaded=$((downloaded + bytes))
 }
 safe_path() {
@@ -83,78 +83,59 @@ else
 	case "$tag" in *[!a-zA-Z0-9._-]*) exit 1;; esac
 	base="$REPO/releases/download/$tag"
 fi
-fetch "$base/$arch$suffix.manifest" "$WORK/manifest"
-fetch "$base/$arch$suffix.manifest.sig" "$WORK/manifest.sig"
+fetch "$base/$arch.manifest" "$WORK/manifest"
+fetch "$base/$arch.manifest.sig" "$WORK/manifest.sig"
 usign -V -p "$KEY" -m "$WORK/manifest" -x "$WORK/manifest.sig"
-read -r magic schema version manifest_arch < "$WORK/manifest"
-[ "$magic" = FFVPN ] && [ "$schema" = 1 ] && [ "$manifest_arch" = "$arch" ]
+read -r magic schema app_version manifest_arch core_version < "$WORK/manifest"
+[ "$magic" = FFVPN ] && [ "$schema" = 2 ] && [ "$manifest_arch" = "$arch" ]
+version=$app_version; [ "$component" != core ] || version=$core_version
 case "$version" in ''|*[!0-9a-zA-Z._-]*) exit 1;; esac
 if [ "$action" = check ]; then
 	printf '%s\n' "$version" > "/tmp/ffvpn-update-$component.latest"
 	echo "$version"; success=1; exit 0
 fi
-mkdir -p "$WORK/new" "$WORK/reuse" "$WORK/backup"
+archive_record=$(sed -n '2p' "$WORK/manifest")
+read -r record archive_hash archive_size archive_name <<EOF
+$archive_record
+EOF
+[ "$record" = A ]
+case "$archive_name" in ''|*[!a-zA-Z0-9._-]*|*..*) exit 1;; esac
+case "$archive_hash" in ''|*[!0-9a-f]*) exit 1;; esac
+[ "${#archive_hash}" = 64 ]
+case "$archive_size" in ''|*[!0-9]*) exit 1;; esac
+[ "$archive_size" -gt 0 ] && [ "$archive_size" -le 134217728 ]
+fetch "$base/$archive_name" "$WORK/release.tar.gz"
+[ "$(wc -c < "$WORK/release.tar.gz" | tr -d ' ')" = "$archive_size" ]
+verify "$archive_hash" "$WORK/release.tar.gz"
+mkdir -p "$WORK/new" "$WORK/backup"
 : > "$WORK/paths"
 : > "$WORK/changed-paths"
 : > "$WORK/touched"
-path='' skip=0 total=0
-while read -r kind a b c d extra; do
-	case "$kind" in
-		FFVPN) ;;
-		F)
-			finish_file
-			[ -z "${extra:-}" ] && safe_path "$d" || { echo 'Invalid release path.' >&2; exit 1; }
-			case "$a" in *[!0-9a-f]*|'') exit 1;; esac
-			[ "${#a}" = 64 ]
-			case "$b" in 644|755) ;; *) exit 1;; esac
-			case "$c" in ''|*[!0-9]*) exit 1;; esac
-			[ "$c" -le 67108864 ]
-			total=$((total + c)); [ "$total" -le 134217728 ]
-			path=$d digest=$a mode=$b size=$c
-			dest=$(destination "$path")
-			grep -Fxq "$path" "$WORK/paths" && exit 1
-			printf '%s\n' "$path" >> "$WORK/paths"
-			# Refuse symlinks anywhere along an installation path.
-			part=''
-			oldIFS=$IFS; IFS=/; set -- ${dest#/}; IFS=$oldIFS
-			for segment in "$@"; do part="$part/$segment"; [ ! -L "$part" ] || exit 1; done
-			mkdir -p "$WORK/new/${path%/*}"
-			: > "$WORK/new/$path"
-			skip=0
-			if [ -f "$dest" ]; then
-				if [ "$action" != reinstall ] && verify "$digest" "$dest"; then cp "$dest" "$WORK/new/$path"; skip=1; reused=$((reused + size))
-				else
-					index_core=$(destination usr/bin/ffvpn-core)
-					[ -x "$index_core" ] || index_core="$ROOT/usr/bin/ffvpn-core"
-					if [ -x "$index_core" ]; then
-						"$index_core" -chunk-file "$dest" -chunk-dir "$WORK/reuse"
-					fi
-				fi
-			fi
-			if [ "$skip" = 0 ]; then printf '%s\n' "$path" >> "$WORK/changed-paths"; fi
-			;;
-		B)
-			[ -n "$path" ] && [ -z "${c:-}${d:-}${extra:-}" ]
-			case "$a" in *[!0-9a-f]*|'') exit 1;; esac
-			[ "${#a}" = 64 ]
-			case "$b" in ''|*[!0-9]*) exit 1;; esac
-			[ "$b" -gt 0 ] && [ "$b" -le 1048576 ]
-			[ "$skip" = 0 ] || continue
-			if [ -f "$WORK/reuse/$a" ]; then source="$WORK/reuse/$a"; reused=$((reused + b))
-			else
-				fetch "$base/$a.gz" "$WORK/block.gz"
-				gzip -dc "$WORK/block.gz" | head -c 1048577 > "$WORK/block"
-				verify "$a" "$WORK/block"
-				source="$WORK/block"
-			fi
-			[ "$(wc -c < "$source" | tr -d ' ')" = "$b" ]
-			cat "$source" >> "$WORK/new/$path"
-			[ "$(wc -c < "$WORK/new/$path" | tr -d ' ')" -le "$size" ]
-			;;
-		*) echo 'Invalid manifest record.' >&2; exit 1;;
-	esac
+total=0
+while read -r kind digest mode size path extra; do
+    case "$kind" in FFVPN|A) continue;; F) ;; *) exit 1;; esac
+    [ -z "${extra:-}" ] && safe_path "$path" || exit 1
+    case "$digest" in ''|*[!0-9a-f]*) exit 1;; esac
+    [ "${#digest}" = 64 ]
+    case "$mode" in 644|755) ;; *) exit 1;; esac
+    case "$size" in ''|*[!0-9]*) exit 1;; esac
+    [ "$size" -le 67108864 ]
+    total=$((total+size)); [ "$total" -le 134217728 ]
+    if [ "$component" = core ]; then
+        case "$path" in usr/bin/ffvpn-core|usr/share/ffvpn/core-version) ;; *) continue;; esac
+    elif [ "$component" = app ]; then
+        case "$path" in usr/bin/ffvpn-core|usr/share/ffvpn/core-version) continue;; esac
+    fi
+    grep -Fxq "$path" "$WORK/paths" && exit 1
+    printf '%s\n' "$path" >> "$WORK/paths"
+    dest=$(destination "$path")
+    part=''; oldIFS=$IFS; IFS=/; set -- ${dest#/}; IFS=$oldIFS
+    for segment in "$@"; do part="$part/$segment"; [ ! -L "$part" ] || exit 1; done
+    mkdir -p "$WORK/new/${path%/*}"
+    tar -xzOf "$WORK/release.tar.gz" "$path" > "$WORK/new/$path"
+    finish_file
+    printf '%s\n' "$path" >> "$WORK/changed-paths"
 done < "$WORK/manifest"
-finish_file
 [ -s "$WORK/paths" ]
 : > "$WORK/obsolete"
 previous="$ROOT/usr/share/ffvpn/installed$suffix.manifest"
@@ -172,7 +153,7 @@ if [ -f "$previous" ]; then
 	done < "$WORK/previous-paths"
 fi
 cat "$WORK/changed-paths" "$WORK/obsolete" > "$WORK/all-paths"
-echo "Verified ffvpn $version. Installing changed files."
+echo "Verified ffvpn $version. Installing complete component files."
 if [ -s "$WORK/new/usr/bin/ffvpn-core" ]; then "$WORK/new/usr/bin/ffvpn-core" -version >/dev/null; fi
 # Preserve every prior file until the complete replacement succeeds.
 while IFS= read -r path; do
@@ -215,5 +196,5 @@ sort -u "$ROOT/usr/share/ffvpn/managed-files" > "$WORK/managed-files"
 cp "$WORK/managed-files" "$ROOT/usr/share/ffvpn/managed-files"
 success=1
 printf '{"downloaded":%s,"reused":%s}\n' "$downloaded" "$reused" > /tmp/ffvpn-update.stats
-echo "Downloaded: $downloaded bytes; reused locally: $reused bytes."
+echo "Downloaded: $downloaded bytes; complete archive downloaded."
 echo "ffvpn $version installed successfully."

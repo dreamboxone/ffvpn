@@ -19,6 +19,6 @@ echo 'PASS: independent core update'
 sh "$UPDATE" update
 downloaded=$(jsonfilter -i /tmp/ffvpn-update.stats -e '@.downloaded')
 reused=$(jsonfilter -i /tmp/ffvpn-update.stats -e '@.reused')
-[ "$downloaded" -lt 300000 ]
-[ "$reused" -gt 10000000 ]
-echo "PASS: unchanged update downloaded $downloaded metadata bytes and reused $reused bytes"
+[ "$downloaded" -gt 1048576 ]
+[ "$reused" = 0 ]
+echo "PASS: full archive downloaded $downloaded bytes without block reuse"

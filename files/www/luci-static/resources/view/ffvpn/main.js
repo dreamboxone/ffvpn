@@ -330,7 +330,7 @@ return view.extend({
      root.querySelectorAll('[data-update]').forEach(function(el){el.disabled=true;el.ffBusy=true;});
      return callUpdate(component,action).then(checked).then(status).catch(function(e){updatePending=null;root.querySelectorAll('[data-update]').forEach(function(el){el.disabled=false;el.ffBusy=false;el.classList.remove('mk-running');});throw e;});
     });b.dataset.update=component;b.dataset.action=action;b.classList.add('mk-small',action==='check'?'soft-blue':action==='update'?'success':'primary');b.prepend(icon(action==='check'?'Updates':'Download'));return b;}
-    content.appendChild(E('p',{},t('Only changed files and binary blocks are downloaded. Downloads are verified before installation.')));
+    content.appendChild(E('p',{},t('The complete release archive is downloaded and verified before installation.')));
     ['app','core'].forEach(function(component){
      updateVersions[component]=E('p',{});
      content.appendChild(card(component==='app'?'ffvpn':'Core',[E('div',{'class':'ff-update-row'},[

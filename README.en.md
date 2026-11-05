@@ -20,7 +20,7 @@ An unofficial client for Firefox's built-in VPN on OpenWrt, with an integrated L
 - Immediate settings and a sliding power switch; no Save & Apply.
 - Detect Zirgozar and PassWall2; warn before routing changes and restore owned settings on disable, preserving later manual edits.
 - Separate application/core update checks, updates and reinstalls, with core path and free space.
-- Signed releases and content-defined differential downloads; unchanged blocks are reused locally.
+- Signed releases with complete archive downloads and SHA-256 verification.
 - Tehran timezone and Iranian time servers, matching Zirgozar.
 
 ## Installation
@@ -49,7 +49,7 @@ Choose Install, Update or Remove. Open LuCI → Services → ffvpn and add a Moz
 
 ## Core and limitations
 
-The core derives from [arman-vpn-client](https://github.com/armanlife/arman-vpn-client), with an OpenWrt entry point. Mozilla updates its service; compatible core builds are distributed through ffvpn releases. Differential download size depends on actual binary changes; first installation requires all files.
+The core derives from [arman-vpn-client](https://github.com/armanlife/arman-vpn-client), with an OpenWrt entry point. Mozilla updates its service; compatible core builds are distributed through ffvpn releases. Updates download the complete release archive and verify its signature and file hashes.
 
 Not affiliated with or endorsed by Mozilla. Account quotas and availability are controlled by Mozilla. TCP is limited to ports 80, 443, 8080 and 8443; UDP also has port restrictions. Some calls, games and SSH connections may fail. The management API is loopback-only; SOCKS is available to LAN devices and blocked from WAN.
 

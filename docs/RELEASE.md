@@ -3,7 +3,7 @@
 - تشخیص خودکار معماری و نسخه OpenWrt؛ منوی نصب، به‌روزرسانی و حذف.
 - ساکس مستقل برای LAN؛ تنظیم و بازگردانی زیرگذر یا PassWall2.
 - چند حساب موزیلا، اولویت، نمایش سهمیه و زمان ریست.
-- به‌روزرسانی امضاشده با دریافت فقط فایل ها و بلوک های تغییرکرده.
+- به روزرسانی امضاشده با دریافت فایل کامل نسخه.
 - تم روشن و تیره، پیروی از تم روتر، پرچم های داخلی و گزارش فارسی.
 
 ### نصب و حذف
@@ -16,7 +16,7 @@ wget -qO /tmp/ffvpn-install.sh https://raw.githubusercontent.com/dreamboxone/ffv
 
 [راهنمای چهارزبانه و نیازمندی ها](https://github.com/dreamboxone/ffvpn#readme) · [تلگرام](https://t.me/routekernel1)
 
-Built with GitHub Actions. OpenWrt targets: 23.05 / 24.10 / 25.12. The installer detects the architecture and verifies signed manifests and SHA-256 before installation. Release assets contain signed architecture manifests and shared compressed differential blocks. Mozilla controls account quotas and service availability.
+Built with GitHub Actions. OpenWrt targets: 23.05 / 24.10 / 25.12. The installer detects the architecture and verifies signed manifests and SHA-256 before installation. Release assets contain signed architecture manifests, complete archives and native IPK/APK packages. Mozilla controls account quotas and service availability.
 
 Build: https://github.com/dreamboxone/ffvpn/actions/runs/41903329762
 

@@ -15,7 +15,7 @@ The workflow tests and cross-builds every architecture in GitHub Actions. Run it
 
 The repository Actions secret `FFVPN_RELEASE_SIGNING_KEY_B64` contains the base64-encoded private usign key matching the pinned public key. It is decoded only into the runner temporary directory, removed after signing, and never included in artifacts. Keep a private backup outside the repository. `build/publish.py` verifies every reconstructed file and detached signature before publication.
 
-The publish job creates a draft, uploads signed manifests, shared compressed blocks, integrated IPK/APK packages, logo, installer and SHA256SUMS, then publishes after all uploads succeed. An interrupted draft can be resumed by rerunning the workflow. Public releases cannot be overwritten; use a new version. Release notes are in `docs/RELEASE.md`.
+The publish job creates a draft, uploads signed manifests, complete architecture archives, integrated IPK/APK packages, logo, installer and SHA256SUMS, then publishes after all uploads succeed. An interrupted draft can be resumed by rerunning the workflow. Public releases cannot be overwritten; use a new version. Release notes are in `docs/RELEASE.md`.
 
 `VERSION` identifies the interface and tools. `CORE_VERSION` identifies the adapted core; update `files/usr/share/ffvpn/core-version` with it. Record upstream source changes in `UPSTREAM.json` and rebuild the core. The updater supports `check`, `update` and `reinstall` for `app`, `core` or `all`.
 
