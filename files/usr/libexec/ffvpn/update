@@ -53,7 +53,13 @@ printf '%s\n%s\n' "$component" "$action" > /tmp/ffvpn-update.job
 
 fetch() {
 	case "$1" in https://*|http://127.0.0.1:* ) ;; *) echo 'Untrusted download address.' >&2; return 1;; esac
-	bytes=$(curl -fLsS --retry 2 --connect-timeout 15 --max-time 120 --max-filesize 134217728 -w '%{size_download}' "$1" -o "$2")
+	echo "Downloading ${1##*/}..." >&2
+	# Keep terminal progress separate from the byte count and background logs.
+	if [ -t 2 ]; then
+		bytes=$(curl -fL --progress-bar --retry 2 --connect-timeout 15 --max-time 120 --max-filesize 134217728 -w '%{size_download}' "$1" -o "$2")
+	else
+		bytes=$(curl -fLsS --retry 2 --connect-timeout 15 --max-time 120 --max-filesize 134217728 -w '%{size_download}' "$1" -o "$2")
+	fi
 	downloaded=$((downloaded + bytes))
 }
 safe_path() {
@@ -105,6 +111,7 @@ case "$archive_hash" in ''|*[!0-9a-f]*) exit 1;; esac
 case "$archive_size" in ''|*[!0-9]*) exit 1;; esac
 [ "$archive_size" -gt 0 ] && [ "$archive_size" -le 134217728 ]
 fetch "$base/$archive_name" "$WORK/release.tar.gz"
+echo 'Verifying the archive and extracting component files...'
 [ "$(wc -c < "$WORK/release.tar.gz" | tr -d ' ')" = "$archive_size" ]
 verify "$archive_hash" "$WORK/release.tar.gz"
 mkdir -p "$WORK/new" "$WORK/backup"
@@ -183,6 +190,7 @@ while IFS= read -r path; do
 done < "$WORK/obsolete"
 mkdir -p "$ROOT/usr/share/ffvpn"
 if [ -z "$ROOT" ] && [ "$mutated" = 1 ]; then
+	echo 'Restarting services...'
 	/etc/init.d/ffvpn start
 	/etc/init.d/rpcd restart
 	rm -f /tmp/luci-indexcache

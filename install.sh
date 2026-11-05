@@ -19,19 +19,23 @@ dependencies() {
 }
 
 install_ffvpn() {
+	echo '[1/4] Installing prerequisites...'
 	dependencies
+	echo '[2/4] Downloading the installer...'
 	stage=$(mktemp -d /tmp/ffvpn-install.XXXXXX)
 	trap 'rm -r "$stage"' EXIT
-	curl -fLsS --connect-timeout 15 --max-time 60 "$BASE/files/usr/libexec/ffvpn/update" -o "$stage/update"
+	curl -fL --progress-bar --connect-timeout 15 --max-time 60 "$BASE/files/usr/libexec/ffvpn/update" -o "$stage/update"
 	cat > "$stage/release.pub" <<'KEY'
 untrusted comment: ffvpn
 RWTXQN/NwokloOBG6TQE/EL2CYV80UKvFwJH6a/inhMgaQ0GxhvfACoj
 KEY
 	# The public key is pinned here; a release cannot replace its own trust root.
+	echo '[3/4] Downloading and verifying ffvpn...'
 	FFVPN_KEY="$stage/release.pub" sh "$stage/update" update
 	if [ ! -f /etc/config/ffvpn ]; then
 		printf "config ffvpn 'main'\n\toption enabled '0'\n\toption network_enabled '0'\n\toption integration 'auto'\n\toption core_dir '/usr/bin'\n" > /etc/config/ffvpn
 	fi
+	echo '[4/4] Starting the service...'
 	/etc/init.d/ffvpn enable
 	/etc/init.d/ffvpn restart
 	echo 'Open LuCI → Services → ffvpn. Add a Mozilla account before enabling routing.'
