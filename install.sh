@@ -73,8 +73,47 @@ remove_ffvpn() {
 	echo 'Removed. Account data remains in /etc/ffvpn/core.'
 }
 
+show_menu() {
+	menu_app_version=$(cat /usr/share/ffvpn/version 2>/dev/null || true)
+	menu_core_version=$(cat /usr/share/ffvpn/core-version 2>/dev/null || true)
+	case "$menu_app_version" in ''|*[!0-9a-zA-Z._-]*) menu_app_version=Unknown;; esac
+	case "$menu_core_version" in ''|*[!0-9a-zA-Z._-]*) menu_core_version=Unknown;; esac
+	menu_core_dir=$(uci -q get ffvpn.main.core_dir 2>/dev/null || echo /usr/bin)
+	menu_core="$menu_core_dir/ffvpn-core"
+	[ -x "$menu_core" ] || menu_core=/usr/bin/ffvpn-core
+	printf '\n\033[1;36m============================================================\n'
+	printf '                         ffvpn\n'
+	printf '============================================================\033[0m\n'
+	printf ' GitHub   : https://github.com/dreamboxone/ffvpn\n'
+	printf ' OpenWrt  : %s\n Architecture: %s\n' "$DISTRIB_RELEASE" "${DISTRIB_ARCH:-Unknown}"
+	if [ -x /usr/libexec/ffvpn/update ] && [ -x /etc/init.d/ffvpn ] &&
+		[ -x "$menu_core" ] && [ -f /www/luci-static/resources/view/ffvpn/main.js ] &&
+		[ "$menu_app_version" != Unknown ]; then
+		printf ' Status   : \033[1;32mInstalled\033[0m\n'
+		printf ' Version  : %s\n Core     : %s\n' "$menu_app_version" "$menu_core_version"
+		if /etc/init.d/ffvpn running >/dev/null 2>&1; then
+			printf ' Service  : \033[1;32mRunning\033[0m\n'
+		else
+			printf ' Service  : \033[1;31mStopped\033[0m\n'
+		fi
+		printf ' LuCI     : Services > ffvpn\n'
+	elif [ -f /usr/share/ffvpn/installed.manifest ] || [ -f /usr/share/ffvpn/version ] ||
+		[ -f /usr/libexec/ffvpn/update ] || [ -f /etc/init.d/ffvpn ] || [ -f "$menu_core" ]; then
+		printf ' Status   : \033[1;31mIncomplete installation\033[0m\n'
+		printf ' Version  : %s\n Core     : %s\n' "$menu_app_version" "$menu_core_version"
+		printf ' Select Install to repair the installation.\n'
+	else
+		printf ' Status   : \033[1;31mNot installed\033[0m\n'
+		printf ' Version  : --\n Core     : --\n'
+	fi
+	printf '%s\n' '------------------------------------------------------------'
+	printf ' 1) Install / Repair\n 2) Update\n 3) Remove\n 0) Exit\n'
+	printf '%s\n' '============================================================'
+	printf '> '
+}
+
 while :; do
-	printf '\nffvpn · OpenWrt %s\n1) Install\n2) Update\n3) Remove\n0) Exit\n> ' "$DISTRIB_RELEASE"
+	show_menu
 	read -r choice || exit 0
 	case "$choice" in
 		1) install_ffvpn;;
