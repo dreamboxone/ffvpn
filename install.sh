@@ -18,20 +18,27 @@ dependencies() {
 	else echo 'No supported package manager.'; exit 1; fi
 }
 
-install_ffvpn() {
-	echo '[1/4] Installing prerequisites...'
-	dependencies
-	echo '[2/4] Downloading the installer...'
+run_update() {
+	echo 'Downloading the latest updater...'
 	stage=$(mktemp -d /tmp/ffvpn-install.XXXXXX)
 	trap 'rm -r "$stage"' EXIT
-	curl -fL --progress-bar --connect-timeout 15 --max-time 60 "$BASE/files/usr/libexec/ffvpn/update" -o "$stage/update"
+	curl -fL --progress-bar --connect-timeout 15 --max-time 60 "$BASE/files/usr/libexec/ffvpn/update?$(date +%s)" -o "$stage/update"
 	cat > "$stage/release.pub" <<'KEY'
 untrusted comment: ffvpn
 RWTXQN/NwokloOBG6TQE/EL2CYV80UKvFwJH6a/inhMgaQ0GxhvfACoj
 KEY
 	# The public key is pinned here; a release cannot replace its own trust root.
-	echo '[3/4] Downloading and verifying ffvpn...'
-	FFVPN_KEY="$stage/release.pub" sh "$stage/update" update
+	FFVPN_PROGRESS=1 FFVPN_KEY="$stage/release.pub" sh "$stage/update" update
+	rm -r "$stage"
+	trap - EXIT
+}
+
+install_ffvpn() {
+	echo '[1/4] Installing prerequisites...'
+	dependencies
+	echo '[2/4] Preparing the updater...'
+	run_update
+	echo '[3/4] Configuring ffvpn...'
 	if [ ! -f /etc/config/ffvpn ]; then
 		printf "config ffvpn 'main'\n\toption enabled '0'\n\toption network_enabled '0'\n\toption integration 'auto'\n\toption core_dir '/usr/bin'\n" > /etc/config/ffvpn
 	fi
@@ -71,7 +78,7 @@ while :; do
 	read -r choice || exit 0
 	case "$choice" in
 		1) install_ffvpn;;
-		2) if [ -x /usr/libexec/ffvpn/update ]; then /usr/libexec/ffvpn/update update; else echo 'Install ffvpn first.'; fi;;
+		2) if [ -x /usr/libexec/ffvpn/update ]; then run_update; else echo 'Install ffvpn first.'; fi;;
 		3) remove_ffvpn;;
 		0) exit 0;;
 		*) echo 'Choose 0, 1, 2 or 3.';;

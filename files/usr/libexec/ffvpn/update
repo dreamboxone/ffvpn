@@ -55,7 +55,7 @@ fetch() {
 	case "$1" in https://*|http://127.0.0.1:* ) ;; *) echo 'Untrusted download address.' >&2; return 1;; esac
 	echo "Downloading ${1##*/}..." >&2
 	# Keep terminal progress separate from the byte count and background logs.
-	if [ -t 2 ]; then
+	if [ "${FFVPN_PROGRESS:-0}" = 1 ] || [ -t 2 ]; then
 		bytes=$(curl -fL --progress-bar --retry 2 --connect-timeout 15 --max-time 120 --max-filesize 134217728 -w '%{size_download}' "$1" -o "$2")
 	else
 		bytes=$(curl -fLsS --retry 2 --connect-timeout 15 --max-time 120 --max-filesize 134217728 -w '%{size_download}' "$1" -o "$2")
