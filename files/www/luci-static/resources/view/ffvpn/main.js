@@ -60,7 +60,7 @@ function card(title, children) { return E('section', {'class':'mk-card ff-card'}
 function homeCard(title,ico,accent,children){return E('section',{'class':'mk-card ff-home-card',style:'--accent:'+accent},[E('div',{'class':'mk-card-title'},[E('span',{'class':'mk-metric-ico'},icon(ico)),E('span',{},t(title))])].concat(children));}
 function formatGB(value){return (Math.max(0,Number(value)||0)/1000000000).toLocaleString(i18n.get(),{minimumFractionDigits:2,maximumFractionDigits:2});}
 function accountDate(value){if(!value||!Number.isFinite(Date.parse(value)))return t('Not recorded');return new Intl.DateTimeFormat(i18n.get()==='fa'?'fa-IR-u-ca-persian':i18n.get()+'-u-ca-gregory',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(value));}
-function formatLatency(value){return Number(value).toLocaleString(i18n.get(),{maximumFractionDigits:0})+' '+(i18n.get()==='fa'?'م‌ثانیه':'ms');}
+function formatLatency(value){var fa=i18n.get()==='fa';return E('span',{'class':'ff-latency',dir:fa?'rtl':'ltr'},[E('bdi',{dir:'ltr'},Number(value).toLocaleString(i18n.get(),{maximumFractionDigits:0})),E('span',{},fa?'م‌ثانیه':'ms')]);}
 function formatKB(value){return (Math.max(0,Number(value)||0)/1024).toLocaleString(i18n.get(),{maximumFractionDigits:2});}
 function uptime(seconds){var n=Math.max(0,Math.floor(Number(seconds)||0));return String(Math.floor(n/3600)).padStart(2,'0')+':'+String(Math.floor(n/60)%60).padStart(2,'0')+':'+String(n%60).padStart(2,'0');}
 function countryName(code,fallback){
@@ -157,7 +157,7 @@ return view.extend({
      homeFields.model.textContent=router.model||'—';homeFields.firmware.textContent=router.version?'OpenWrt '+router.version:'—';
      homeFields.memory.textContent=router.memory_total?Math.round((1-Number(router.memory_free)/Number(router.memory_total))*100)+'%':'—';homeFields.load.textContent=router.load?(Number(router.load)/65536).toFixed(2):'—';
      homeFields.country.textContent=countryName(proxy.country_code||core.selection,proxy.country_name||core.selection_name||t('Recommended location'));homeFields.server.textContent=proxy.upstream||'—';homeFields.protocol.textContent=proxy.transport?proxy.transport.toUpperCase().replace('H','HTTP/'):'—';
-     homeFields.latency.textContent=state.enabled&&(exit.latency_ms>0||test.total_ms>0)?formatLatency(exit.latency_ms||test.total_ms):'—';
+     homeFields.latency.replaceChildren(state.enabled&&(exit.latency_ms>0||test.total_ms>0)?formatLatency(exit.latency_ms||test.total_ms):'—');
      if(proxy.country_code)rememberCountry(proxy.country_code,proxy.country_name);
      else if(!lastCountry)rememberCountry(core.selection,core.selection_name);
      if(lastCountry){homeFields.country.textContent=countryName(lastCountry.code,lastCountry.name);homeFields.orb.replaceChildren(flag(lastCountry.code,homeFields.country.textContent));}
@@ -291,7 +291,7 @@ return view.extend({
      var value=E('span',{'class':'pwp-check-value'},t('Check'));
      var check=E('button',{type:'button','class':'pwp-social-check',style:'--site-colour:'+site[2],click:function(){
       var previous=connectionCard.querySelector(':scope > .ff-inline-note');if(previous)previous.remove();check.disabled=true;value.textContent=t('Connecting');value.className='pwp-check-value mk-wait';
-      callConnectionCheck(site[0]).then(checked).then(function(r){var ms=Number(r.ms)||0;value.textContent=ms>0&&r.http_code!=='000'?formatLatency(ms):'—';value.className='pwp-check-value '+(ms>0&&r.http_code!=='000'?'mk-on':'mk-bad');}).catch(function(e){value.textContent='—';note(t(e.message),true,connectionCard);}).finally(function(){check.disabled=false;});
+      callConnectionCheck(site[0]).then(checked).then(function(r){var ms=Number(r.ms)||0;value.replaceChildren(ms>0&&r.http_code!=='000'?formatLatency(ms):'—');value.className='pwp-check-value '+(ms>0&&r.http_code!=='000'?'mk-on':'mk-bad');}).catch(function(e){value.textContent='—';note(t(e.message),true,connectionCard);}).finally(function(){check.disabled=false;});
      }},[E('span',{'class':'pwp-social-icon'},[E('img',{src:L.resource('ffvpn/site-icons/'+site[0]+(site[0]==='arvancloud'?'.svg':'.ico')),alt:''})]),E('span',{'class':'pwp-social-name'},site[1]),value]);connectionCard.appendChild(check);
     });
     homeFields.usage={};var values=E('div',{'class':'pwp-usage-values'},['up','down','total'].map(function(key){var node=E('strong',{dir:'ltr'},'—');homeFields.usage[key]=node;return E('div',{'class':'pwp-usage-value'},[E('span',{},t({up:'Upload',down:'Download',total:'Total'}[key])),node]);}));

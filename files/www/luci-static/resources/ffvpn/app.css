@@ -182,6 +182,7 @@
 .ffvpn .ff-clock-row{margin-top:22px;margin-bottom:0}
 @media(max-width:700px){.ffvpn .ff-setting-field>span{flex-basis:auto}.ffvpn .ff-setting-field select,.ffvpn .ff-setting-field input{flex:0 0 auto;width:100%;max-width:420px}.ffvpn .ff-setting-field{gap:8px}}
 
+.ffvpn .ff-latency{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
 .ffvpn .ff-server-ping{font-size:11px;font-weight:700;align-self:center;white-space:nowrap}
 .ffvpn .ff-ping-green{color:#15803d}.ffvpn .ff-ping-yellow{color:#a17a00}.ffvpn .ff-ping-orange{color:#ea580c}.ffvpn .ff-ping-red{color:#dc2626}.ffvpn .ff-ping-brown{color:#854d2b}
 .ffvpn.mk-dark .ff-ping-green{color:#4ade80}.ffvpn.mk-dark .ff-ping-yellow{color:#facc15}.ffvpn.mk-dark .ff-ping-orange{color:#fb923c}.ffvpn.mk-dark .ff-ping-red{color:#f87171}.ffvpn.mk-dark .ff-ping-brown{color:#c68b59}
