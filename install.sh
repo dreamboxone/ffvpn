@@ -9,12 +9,21 @@ BASE=https://raw.githubusercontent.com/dreamboxone/ffvpn/main
 case "$DISTRIB_RELEASE" in 23.05*|24.10*|25.12*) ;; *) echo "Unsupported OpenWrt release: $DISTRIB_RELEASE"; exit 1;; esac
 
 dependencies() {
+	set --
+	for utility in curl usign rpcd jsonfilter; do
+		command -v "$utility" >/dev/null 2>&1 || set -- "$@" "$utility"
+	done
+	[ -f /www/luci-static/resources/luci.js ] || set -- "$@" luci-base
+	# Either nftables variant is sufficient; preserve the system's choice.
+	command -v nft >/dev/null 2>&1 || set -- "$@" nftables
+	if [ "$#" = 0 ]; then echo 'Prerequisites already available; no system packages changed.'; return; fi
+	printf 'Installing missing prerequisites: %s\n' "$*"
 	if command -v apk >/dev/null 2>&1; then
 		apk update
-		apk add curl usign luci-base rpcd jsonfilter nftables-json
+		apk add "$@"
 	elif command -v opkg >/dev/null 2>&1; then
 		opkg update
-		opkg install curl usign luci-base rpcd jsonfilter nftables-json
+		opkg install "$@"
 	else echo 'No supported package manager.'; exit 1; fi
 }
 

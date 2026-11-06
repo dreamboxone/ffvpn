@@ -20,7 +20,7 @@ a = p.parse_args()
 # process's private-key umask. The signing key is outside this staging tree.
 os.umask(0o022)
 version = pathlib.Path('VERSION').read_text().strip()
-dependencies = ['curl', 'usign', 'luci-base', 'rpcd', 'jsonfilter', 'nftables-json']
+dependencies = ['curl', 'usign', 'luci-base', 'rpcd', 'jsonfilter', 'nftables']
 postinst = '''#!/bin/sh
 [ -z "${IPKG_INSTROOT:-}" ] || exit 0
 /etc/init.d/ffvpn enable
