@@ -1,4 +1,4 @@
-// Package tunservice is the TUN service (cmd/firefox-vpn-tun): it serves
+// Package tunservice is the TUN service (cmd/arman-vpn-tun): it serves
 // the tunapi protocol on the service's channel and runs one TUN session at
 // a time, for the core that opened it, until that core closes it or its
 // connection ends. Every TCP flow goes to the core's SOCKS5 server on
@@ -22,6 +22,15 @@ import (
 
 // adapterMTU is the TUN adapter's MTU; AdapterName (adapter_*.go) its name.
 const adapterMTU = 9000
+
+// sessionMTU is the MTU a core asks for (tun.mtu), within bounds, or
+// adapterMTU.
+func sessionMTU(asked int) int {
+	if asked < 1280 || asked > adapterMTU {
+		return adapterMTU
+	}
+	return asked
+}
 
 var (
 	// adapterV4 is the adapter's address in tun.DesktopNet; Windows sends

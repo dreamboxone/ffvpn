@@ -123,10 +123,12 @@ type Daemon struct {
 	// the persisted choice, which the switch updated.
 	failover *proxy.ServerFailover
 	signins  *signInRegistry
-	restart  chan struct{}
-	stop     chan struct{}
-	stopOnce sync.Once
-	finished chan struct{}
+	// signInProxy is the browser sign-in's proxy (signin_proxy.go).
+	signInProxy signInProxy
+	restart     chan struct{}
+	stop        chan struct{}
+	stopOnce    sync.Once
+	finished    chan struct{}
 	// LocalToken authorizes local clients (the tray) without the dashboard
 	// login; it is regenerated at every start and stored in the data folder.
 	localToken string
@@ -191,11 +193,9 @@ type Daemon struct {
 	// connection test (autoconnect.go).
 	autoConnect chan struct{}
 	// connectAttempt is the user's connect until it reaches Mozilla or is
-	// given up; connectFailure why the last one was given up; lastConnected
-	// when a connection last reached Mozilla (connect.go).
-	connectAttempt chan struct{}
+	// given up. connectFailure is why the last one was given up.
+	connectAttempt *connectAttempt
 	connectFailure string
-	lastConnected  time.Time
 	engine         *proxyEngine
 	state          engineState
 	countries      []serverlist.Country
@@ -233,6 +233,7 @@ func NewDaemon(paths DataPaths, forceVerbose bool) (*Daemon, error) {
 	if err != nil {
 		return nil, err
 	}
+	proxy.SetUpstreamIPVersion(cfg.Proxy.IPVersion)
 	store, order, err := OpenAccounts(paths, &cfg)
 	if err != nil {
 		return nil, err
@@ -310,6 +311,7 @@ func (d *Daemon) Run() error {
 	go d.watchNetwork()
 	d.superviseEngine()
 	d.CloseTunListener()
+	d.signInProxy.close()
 	if d.dashboard != nil {
 		d.dashboard.close()
 	}
@@ -481,6 +483,9 @@ func (d *Daemon) setOn(on bool) {
 	d.mu.Lock()
 	changed := d.off == on
 	d.off = !on
+	if on {
+		d.connectFailure = ""
+	}
 	d.mu.Unlock()
 	if changed {
 		logx.Info("proxy turned on=%t", on)
@@ -806,7 +811,7 @@ func (d *Daemon) addSignedInAccount(email, password string, token *fxa.TokenResp
 	if err := d.accountsChanged(); err != nil {
 		return acc, err
 	}
-	if err := d.refreshAccountUsage(acc.ID); err != nil {
+	if err := d.refreshAccountUsage(acc.ID, false); err != nil {
 		logx.Debug("reading the new account's quota failed account=%s err=%s", logx.Email(acc.Name()), logx.Err(err))
 	}
 	return acc, nil
@@ -897,8 +902,8 @@ func (d *Daemon) activateAccount(id string) error {
 	return nil
 }
 
-// refreshAccountUsage reads an account's quota without minting a pass.
-func (d *Daemon) refreshAccountUsage(id string) error {
+// refreshAccountUsage allows a pass request only on an explicit refresh.
+func (d *Daemon) refreshAccountUsage(id string, manual bool) error {
 	acc, err := d.store.Get(id)
 	if err != nil {
 		return err
@@ -912,17 +917,20 @@ func (d *Daemon) refreshAccountUsage(id string) error {
 	if auth, err = proxy.FreshRuntimeAuth(ctx, auth); err != nil {
 		return err
 	}
-	usage, err := guardian.FetchProxyUsage(ctx, d.config().Network.GuardianEndpoint, auth.Token.AccessToken)
+	fetchUsage := guardian.FetchProxyUsage
+	if manual {
+		fetchUsage = guardian.RefreshProxyUsage
+	}
+	usage, err := fetchUsage(ctx, d.config().Network.GuardianEndpoint, auth.Token.AccessToken)
 	if err != nil {
 		return err
 	}
-	if _, err := d.mgr.ObserveUsage(id, proxy.AccountUsage(usage)); err == nil {
+	reading := proxy.AccountUsage(usage)
+	if _, err := d.mgr.ObserveUsage(id, reading); err == nil {
 		return nil
 	}
 	// Disabled accounts are not managed; record the usage directly.
-	u := proxy.AccountUsage(usage)
-	acc.Usage = &u
-	return d.store.Save(acc)
+	return d.store.SaveUsage(id, reading)
 }
 
 func (d *Daemon) saveConfig() error {
@@ -997,6 +1005,8 @@ func (d *Daemon) updateSettings(next config.Config, newPassword *string) (settin
 	d.mu.Lock()
 	d.cfg = next
 	d.mu.Unlock()
+	// Before the engine restarts on it; the location pings take it too.
+	proxy.SetUpstreamIPVersion(next.Proxy.IPVersion)
 
 	logx.Verbose.Store(next.Logging.Verbose || d.forceVerbose)
 	d.mgr.SetPolicy(accounts.Policy{ThresholdPercent: next.Accounts.SwitchThresholdPercent})

@@ -265,10 +265,7 @@ func auditEcho(t *testing.T, conn net.Conn, value string) {
 
 func auditCurlClients(t *testing.T, addr string) {
 	t.Helper()
-	curl, err := exec.LookPath("curl.exe")
-	if err != nil {
-		curl, err = exec.LookPath("curl")
-	}
+	curl, err := exec.LookPath("curl")
 	if err != nil {
 		t.Skip("curl is required for the external-client SOCKS5 integration test")
 	}

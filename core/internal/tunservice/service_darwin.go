@@ -15,7 +15,7 @@ import (
 )
 
 // InstallDir is the installed service's folder.
-const InstallDir = "/Library/Application Support/Firefox VPN TUN"
+const InstallDir = "/Library/Application Support/Arman VPN TUN"
 
 // jobTarget is the service in launchctl's commands.
 const jobTarget = "system/" + tunapi.LaunchdLabel

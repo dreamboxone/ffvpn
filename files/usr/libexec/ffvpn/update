@@ -35,20 +35,23 @@ rollback() {
 }
 cleanup() {
 	result=$?
-	printf '%s\n' "$result" > /tmp/ffvpn-update.result
 	if [ "$success" != 1 ]; then
 		[ "$mutated" != 1 ] || [ -n "$ROOT" ] || /etc/init.d/ffvpn stop || true
 		rollback
 		[ "$mutated" != 1 ] || [ -n "$ROOT" ] || /etc/init.d/ffvpn start || true
 	fi
 	rm -r "$WORK"
-	[ "$locked" != 1 ] || rmdir "$LOCK"
 	[ "$control_locked" != 1 ] || rmdir /var/lock/ffvpn-control
+	if [ "$locked" = 1 ]; then
+		printf '%s\n' "$result" > /tmp/ffvpn-update.result
+		rmdir "$LOCK"
+	fi
 }
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
 mkdir "$LOCK" 2>/dev/null || { echo 'Another update is in progress.' >&2; exit 1; }
 locked=1
+rm -f /tmp/ffvpn-update.result
 printf '%s\n%s\n' "$component" "$action" > /tmp/ffvpn-update.job
 
 fetch() {
@@ -83,9 +86,11 @@ if [ -n "${FFVPN_RELEASE_BASE:-}" ]; then
 else
 	. /etc/openwrt_release
 	arch=$DISTRIB_ARCH
-	fetch https://api.github.com/repos/dreamboxone/ffvpn/releases/latest "$WORK/latest.json"
-	tag=$(jsonfilter -i "$WORK/latest.json" -e '@.tag_name')
-	case "$tag" in v[0-9]* ) ;; *) echo 'No published release.' >&2; exit 1;; esac
+	# Resolve the release without GitHub's rate-limited anonymous API.
+	latest=$(curl -fLsSI --retry 2 --connect-timeout 15 --max-time 60 \
+		-w '%{url_effective}' -o /dev/null "$REPO/releases/latest")
+	case "$latest" in "$REPO/releases/tag/v"[0-9]*) ;; *) echo 'No published FFVPN release.' >&2; exit 1;; esac
+	tag=${latest##*/}
 	case "$tag" in *[!a-zA-Z0-9._-]*) exit 1;; esac
 	base="$REPO/releases/download/$tag"
 fi
@@ -94,10 +99,13 @@ fetch "$base/$arch.manifest.sig" "$WORK/manifest.sig"
 usign -V -p "$KEY" -m "$WORK/manifest" -x "$WORK/manifest.sig"
 read -r magic schema app_version manifest_arch core_version < "$WORK/manifest"
 [ "$magic" = FFVPN ] && [ "$schema" = 2 ] && [ "$manifest_arch" = "$arch" ]
+for v in "$app_version" "$core_version"; do
+	case "$v" in ''|*[!0-9a-zA-Z._-]*) exit 1;; esac
+done
 version=$app_version; [ "$component" != core ] || version=$core_version
-case "$version" in ''|*[!0-9a-zA-Z._-]*) exit 1;; esac
+printf '%s\n' "$app_version" > /tmp/ffvpn-update-app.latest
+printf '%s\n' "$core_version" > /tmp/ffvpn-update-core.latest
 if [ "$action" = check ]; then
-	printf '%s\n' "$version" > "/tmp/ffvpn-update-$component.latest"
 	echo "$version"; success=1; exit 0
 fi
 archive_record=$(sed -n '2p' "$WORK/manifest")
@@ -161,7 +169,10 @@ if [ -f "$previous" ]; then
 fi
 cat "$WORK/changed-paths" "$WORK/obsolete" > "$WORK/all-paths"
 echo "Verified ffvpn $version. Installing complete component files."
-if [ -s "$WORK/new/usr/bin/ffvpn-core" ]; then "$WORK/new/usr/bin/ffvpn-core" -version >/dev/null; fi
+if [ "$component" != app ]; then
+	[ "$(cat "$WORK/new/usr/share/ffvpn/core-version")" = "$core_version" ]
+	[ "$("$WORK/new/usr/bin/ffvpn-core" -version)" = "$core_version" ]
+fi
 # Preserve every prior file until the complete replacement succeeds.
 while IFS= read -r path; do
 	dest=$(destination "$path")
@@ -192,9 +203,11 @@ mkdir -p "$ROOT/usr/share/ffvpn"
 if [ -z "$ROOT" ] && [ "$mutated" = 1 ]; then
 	echo 'Restarting services...'
 	/etc/init.d/ffvpn start
-	/etc/init.d/rpcd restart
-	rm -f /tmp/luci-indexcache
-	/etc/init.d/uhttpd reload
+	if [ "$component" != core ]; then
+		/etc/init.d/rpcd restart
+		rm -f /tmp/luci-indexcache
+		/etc/init.d/uhttpd reload
+	fi
 fi
 cp "$WORK/manifest" "$ROOT/usr/share/ffvpn/installed$suffix.manifest"
 if [ "$component" != core ]; then printf '%s\n' "$version" > "$ROOT/usr/share/ffvpn/version"; fi

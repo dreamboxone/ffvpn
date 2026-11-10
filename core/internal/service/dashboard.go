@@ -59,7 +59,8 @@ const (
 // sessionLifetime, until the username or password changes (which signs
 // everyone out) or it is signed out.
 type dashboardServer struct {
-	d *Daemon
+	luciBackup luciBackupTransfer
+	d          *Daemon
 
 	mu       sync.Mutex
 	server   *http.Server
@@ -220,8 +221,17 @@ func (s *dashboardServer) handler() http.Handler {
 	mux.HandleFunc("POST /api/accounts/{id}/enabled", s.handleAccountEnabled)
 	mux.HandleFunc("POST /api/accounts/{id}/refresh", s.handleAccountRefresh)
 	mux.HandleFunc("DELETE /api/accounts/{id}", s.handleAccountRemove)
+	mux.HandleFunc("GET /api/backup", s.handleBackupExport)
+	mux.HandleFunc("POST /api/backup/inspect", s.handleBackupInspect)
+	mux.HandleFunc("POST /api/backup/import", s.handleBackupImport)
+	mux.HandleFunc("POST /api/backup/transfer", s.handleLuCIBackup)
 
 	mux.HandleFunc("POST /api/signin", s.handleSignInStart)
+	// The literal path wins over the {id} patterns below; ids are 24 hex
+	// characters, never "browser".
+	mux.HandleFunc("POST /api/signin/browser", s.handleSignInBrowser)
+	mux.HandleFunc("POST /api/signin/browser/proxy", s.handleSignInProxyOpen)
+	mux.HandleFunc("DELETE /api/signin/browser/proxy", s.handleSignInProxyClose)
 	mux.HandleFunc("GET /api/signin/{id}", s.handleSignInGet)
 	mux.HandleFunc("POST /api/signin/{id}", s.handleSignInAnswer)
 	mux.HandleFunc("DELETE /api/signin/{id}", s.handleSignInCancel)

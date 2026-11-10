@@ -142,10 +142,7 @@ case "$1" in
 				case "$action" in check|update|reinstall) ;; *) reply_error 'Invalid update action'; exit 0;; esac
 				if [ -d /var/lock/ffvpn-update ]; then reply_error 'Update already in progress.'
 				else
-					if [ "$component:$action" = all:check ]; then
-						( /usr/libexec/ffvpn/update check app && /usr/libexec/ffvpn/update check core ) </dev/null >/tmp/ffvpn-update.log 2>&1 &
-					else /usr/libexec/ffvpn/update "$action" "$component" </dev/null >/tmp/ffvpn-update.log 2>&1 &
-					fi
+					/usr/libexec/ffvpn/update "$action" "$component" </dev/null >/tmp/ffvpn-update.log 2>&1 &
 					echo '{"started":true}'
 				fi
 				;;

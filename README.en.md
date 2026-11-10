@@ -51,6 +51,12 @@ Choose Install, Update or Remove. Open LuCI → Services → ffvpn and add a Moz
 
 The core derives from [arman-vpn-client](https://github.com/armanlife/arman-vpn-client), with an OpenWrt entry point. Mozilla updates its service; compatible core builds are distributed through ffvpn releases. Updates download the complete release archive and verify its signature and file hashes.
 
+### Browser sign-in
+
+1. Open the router's local LuCI address over HTTPS in Chrome or Edge and select **Accounts → Add user**.
+2. Download and extract the FFVPN extension from that form. Enable Developer mode at `chrome://extensions` or `edge://extensions`, then select the extracted folder with **Load unpacked**.
+3. Select **Sign in with Mozilla in your browser**, then click the extension icon in that LuCI tab. Complete sign-in and verification in Mozilla's tab. LuCI shows the result.
+
 Not affiliated with or endorsed by Mozilla. Account quotas and availability are controlled by Mozilla. TCP is limited to ports 80, 443, 8080 and 8443; UDP also has port restrictions. Some calls, games and SSH connections may fail. The management API is loopback-only; SOCKS is available to LAN devices and blocked from WAN.
 
 ## Licenses

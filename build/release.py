@@ -7,6 +7,7 @@ import io
 import pathlib
 import subprocess
 import tarfile
+import zipfile
 from assets import restore_logo
 
 restore_logo()
@@ -25,11 +26,19 @@ a.out.mkdir(parents=True, exist_ok=True)
 files = {f.relative_to(a.root).as_posix(): f for f in a.root.rglob('*') if f.is_file()}
 files.pop('etc/config/ffvpn', None)
 files['usr/bin/ffvpn-core'] = a.binary
+extension = io.BytesIO()
+with zipfile.ZipFile(extension, mode='w') as z:
+    for name in ('manifest.json', 'mozilla.js', 'worker.js'):
+        source = pathlib.Path('browser-signin') / name
+        z.writestr(zipfile.ZipInfo('ffvpn-browser-signin/' + name), source.read_bytes())
+    z.writestr(zipfile.ZipInfo('ffvpn-browser-signin/LICENSE'), pathlib.Path('LICENSE').read_bytes())
+extension_path = 'www/luci-static/resources/ffvpn/browser-signin.zip'
+files[extension_path] = None
 records = [f'FFVPN 2 {a.version} {a.arch} {a.core_version}']
 stream = io.BytesIO()
 with tarfile.open(fileobj=stream, mode='w') as tar:
     for name, source in sorted(files.items()):
-        data = source.read_bytes()
+        data = extension.getvalue() if name == extension_path else source.read_bytes()
         mode = 0o755 if name.startswith(('usr/libexec/', 'etc/init.d/')) or name == 'usr/bin/ffvpn-core' else 0o644
         info = tarfile.TarInfo(name)
         info.mode, info.size = mode, len(data)

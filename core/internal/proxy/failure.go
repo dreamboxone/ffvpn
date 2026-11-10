@@ -30,7 +30,7 @@ const (
 	FailureUnreachable = "unreachable"
 	// FailureInsideVPN: as unreachable, on a device whose own internet
 	// already leaves through a VPN's exit (Fastly's network: another
-	// Firefox VPN, on this device or one whose proxy it uses), which lets
+	// Arman VPN, on this device or one whose proxy it uses), which lets
 	// only web ports through, not Mozilla's proxy port.
 	FailureInsideVPN = "inside_vpn"
 	// FailureUpstreamProxy: as unreachable, through the user's own SOCKS5

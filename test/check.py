@@ -12,6 +12,14 @@ for path in (root/'files').rglob('*.json'):
     json.loads(path.read_text())
 for path in (root/'files').rglob('*.js'):
     subprocess.run(['node', '--check', str(path)], check=True)
+extension = root/'browser-signin'
+manifest = json.loads((extension/'manifest.json').read_text())
+assert (extension/manifest['background']['service_worker']).is_file()
+for script in manifest['content_scripts']:
+    for name in script['js']:
+        assert (extension/name).is_file()
+for path in extension.glob('*.js'):
+    subprocess.run(['node', '--check', str(path)], check=True)
 assert (root/'CORE_VERSION').read_text().strip() == (root/'files/usr/share/ffvpn/core-version').read_text().strip()
 for lang in ('en','zh','ru'):
     assert (root/f'README.{lang}.md').is_file()

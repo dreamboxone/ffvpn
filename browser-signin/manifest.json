@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "FFVPN Browser Sign-in",
+  "version": "1.0.0",
+  "minimum_chrome_version": "106",
+  "description": "Add a Mozilla account to FFVPN from its Accounts page.",
+  "permissions": ["activeTab", "scripting", "storage", "declarativeNetRequestWithHostAccess"],
+  "host_permissions": ["https://accounts.firefox.com/*"],
+  "action": {"default_title": "Sign in to FFVPN"},
+  "background": {"service_worker": "worker.js"},
+  "content_scripts": [{
+    "matches": ["https://accounts.firefox.com/*"],
+    "js": ["mozilla.js"],
+    "run_at": "document_start"
+  }]
+}

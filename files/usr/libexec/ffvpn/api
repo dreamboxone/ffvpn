@@ -3,7 +3,11 @@ set -eu
 method=${1:-GET} path=${2:-/status}
 case "$path" in *..*|*\?*|*\#*|*://*|*[!a-zA-Z0-9/_-]*) echo '{"error":"Invalid API path"}'; exit 1;; esac
 case "$method:$path" in
-	GET:/status|GET:/accounts|GET:/locations|GET:/settings|PUT:/settings|GET:/logs|GET:/signin/*|POST:/signin|POST:/signin/*|DELETE:/signin/*|POST:/accounts/order|POST:/accounts/*/activate|POST:/accounts/*/enabled|POST:/accounts/*/refresh|DELETE:/accounts/*|POST:/location|POST:/locations/ping|POST:/test|POST:/proxy/restart) ;;
+	POST:/signin/browser) ;;
+	*:/signin/browser|*:/signin/browser/*) echo '{"error":"API operation is not allowed"}'; exit 1;;
+esac
+case "$method:$path" in
+	GET:/status|GET:/accounts|GET:/locations|GET:/settings|PUT:/settings|GET:/logs|GET:/signin/*|POST:/signin|POST:/signin/*|DELETE:/signin/*|POST:/accounts/order|POST:/accounts/*/activate|POST:/accounts/*/enabled|POST:/accounts/*/refresh|DELETE:/accounts/*|POST:/location|POST:/locations/ping|POST:/test|POST:/proxy/restart|POST:/backup/transfer) ;;
 	*) echo '{"error":"API operation is not allowed"}'; exit 1;;
 esac
 token=$(cat /etc/ffvpn/core/local-api.token)

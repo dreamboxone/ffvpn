@@ -137,7 +137,7 @@ return view.extend({
   var lastCountry=null;try{lastCountry=JSON.parse(localStorage.getItem('ffvpn-last-country'));}catch(e){}
   function rememberCountry(code,name){if(!/^[A-Z]{2}$/.test(String(code||'').toUpperCase()))return;lastCountry={code:String(code).toUpperCase(),name:name||code};try{localStorage.setItem('ffvpn-last-country',JSON.stringify(lastCountry));}catch(e){}}
   var masterCard=E('div',{'class':'ff-power ff-basic-power'},[E('label',{'class':'ff-switch'},[power,E('span',{'class':'ff-slider'})]),E('strong',{},t('Main Switch'))]);
-  var integrationButton=null,integrationTarget=null,integrationPending=false;
+  var integrationButton=null,integrationTarget=null,integrationPending=false,settingsSave=Promise.resolve();
   var refreshLogPage=null;
   var updateText=null, updateVersions={}, updatePending=null, homeFields={}, usagePeriod='today', usageData=null;
   function line(label,key){var node=E('bdi',{dir:'auto'},'—');homeFields[key]=node;return E('div',{'class':'pwp-detail-row ff-detail-row'},[E('span',{},t(label)),node]);}
@@ -157,6 +157,7 @@ return view.extend({
    if(mode==='auto'&&root.zgzSyncTheme)root.zgzSyncTheme();
   }
   function status(){
+   if(current==='Updates'&&updateText)return refreshUpdateStatus();
    return Promise.all([callStatus(),callAPI('/status').catch(function(){return {};})]).then(function(values){
     if(!root.isConnected)return;
     if(current==='Logs'&&refreshLogPage)refreshLogPage().catch(function(){});
@@ -176,7 +177,7 @@ return view.extend({
      var router=state.router||{},proxy=core.proxy||{},exit=core.exit||{},test=core.last_test||{};
      homeFields.model.textContent=router.model||'—';homeFields.firmware.textContent=router.version?'OpenWrt '+router.version:'—';
      homeFields.memory.textContent=router.memory_total?Math.round((1-Number(router.memory_free)/Number(router.memory_total))*100)+'%':'—';homeFields.load.textContent=router.load?(Number(router.load)/65536).toFixed(2):'—';
-     homeFields.country.textContent=countryName(proxy.country_code||core.selection,proxy.country_name||core.selection_name||t('Recommended location'));homeFields.server.textContent=proxy.upstream||'—';homeFields.protocol.textContent=proxy.transport?proxy.transport.toUpperCase().replace('H','HTTP/'):'—';
+     homeFields.country.textContent=countryName(proxy.country_code||core.selection,proxy.country_name||core.selection_name||t('Recommended location'));homeFields.server.textContent=proxy.upstream||'—';homeFields.protocol.textContent={h1:'HTTP/1.1',h2:'HTTP/2',h3:'HTTP/3'}[proxy.transport]||'—';
      homeFields.latency.replaceChildren(state.enabled&&(exit.latency_ms>0||test.total_ms>0)?formatLatency(exit.latency_ms||test.total_ms):'—');
      if(proxy.country_code)rememberCountry(proxy.country_code,proxy.country_name);
      else if(!lastCountry)rememberCountry(core.selection,core.selection_name);
@@ -188,7 +189,11 @@ return view.extend({
      var p=state[name]||{};
      return E('div',{'class':'ff-engine-state'},[E('strong',{},name==='zirgozar'?'Zirgozar':'PassWall2'),E('span',{},t(p.installed?'Installed':'Not installed')+' · '+t(p.enabled?'Enabled':'Disabled')+' · '+t(p.running?'Running':'Stopped'))]);
     }));
-    if(current==='Updates'&&updateText)return callUpdateStatus().then(function(r){
+   });
+  }
+  function refreshUpdateStatus(){
+   return callUpdateStatus().then(function(r){
+     if(current!=='Updates'||!updateText)return;
      updateText.textContent=r.message||t('No update has been run yet.');
      ['app','core'].forEach(function(c){if(updateVersions[c]){
       var installed=r[c+'_version']||'—',latest=r[c+'_latest'];
@@ -199,12 +204,12 @@ return view.extend({
      root.querySelectorAll('[data-update]').forEach(function(b){
       var active=busy&&((r.component||updatePending&&updatePending.component)===b.dataset.update)&&((r.action||updatePending&&updatePending.action)===b.dataset.action);
       b.ffBusy=busy;b.disabled=busy;b.classList.toggle('mk-running',!!active);
-      if(r.component===b.dataset.update&&r.action===b.dataset.action&&r.message){var failed=!busy&&r.result&&r.result!=='0';note(busy?t(r.action==='check'?'Checking version':'Updating files'):failed?t('The operation failed. Check the router connection and try again.'):t(r.action==='check'?'Version check complete':'Update complete'),!!failed,b);}
+      if(r.component===b.dataset.update&&r.action===b.dataset.action&&(busy||r.result)){var failed=!busy&&r.result!=='0';note(busy?t(r.action==='check'?'Checking version':'Updating files'):failed?t('The operation failed. Check the router connection and try again.'):t(r.action==='check'?'Version check complete':'Update complete'),!!failed,b);}
      });
+     updateText.style.display=!busy&&r.result&&r.result!=='0'&&r.message?'':'none';
      if(updateVersions.space){var gb=Number(r.free_kb)*1024/1000000000;updateVersions.space.textContent=t('Free space')+': '+(Number.isFinite(gb)?gb.toLocaleString(i18n.get(),{maximumFractionDigits:2}):'—')+' '+t('GB');}
      if(updateVersions.path)updateVersions.path.textContent=r.core_path||'/usr/bin/ffvpn-core';
      if(updateVersions.directory&&document.activeElement!==updateVersions.directory)updateVersions.directory.value=r.core_dir||'/usr/bin';
-    });
    });
   }
   power.addEventListener('change',function(){
@@ -245,11 +250,106 @@ return view.extend({
   }
   var accountBox;
   function showAccounts(){return renderAccounts().then(function(list){accountBox.replaceChildren(list);});}
+  function backupActions(){
+   var path='/backup/transfer', chunkSize=12*1024;
+   var file=E('input',{type:'file',accept:'.zip,application/zip'});
+   async function transfer(action,run){
+    var start=await write(path,{action:action});
+    try{return await run(start);}
+    finally{await write(path,{action:'close',id:start.id}).catch(function(){});}
+   }
+   return E('details',{'class':'ff-card'},[
+    E('summary',{},t('Account backup')),
+    E('p',{},t('Keep backup files private. They contain account credentials and settings.')),
+    E('div',{'class':'ff-actions'},[
+     button('Export backup',function(){return transfer('export',async function(start){
+      var chunks=[];
+      for(var offset=0;offset<start.size;offset+=chunkSize){
+       var response=await write(path,{action:'read',id:start.id,offset:offset});
+       var bytes=Uint8Array.from(atob(response.data),function(c){return c.charCodeAt(0);});
+       chunks.push(bytes);
+      }
+      var url=URL.createObjectURL(new Blob(chunks,{type:'application/zip'}));
+      var link=E('a',{href:url,download:'FFVPN-backup-'+new Date().toISOString().slice(0,10)+'.zip'});
+      link.click();
+      window.setTimeout(function(){URL.revokeObjectURL(url);},1000);
+     });}),
+     E('label',{'class':'ff-setting-field'},[E('span',{},t('Backup file')),file]),
+     button('Import accounts',async function(anchor){
+      var selected=file.files[0];
+      if(!selected||!selected.size||selected.size>16*1024*1024)throw new Error(t('Select a ZIP backup up to 16 MB.'));
+      await transfer('upload',async function(start){
+       for(var offset=0;offset<selected.size;offset+=chunkSize){
+        var bytes=new Uint8Array(await selected.slice(offset,offset+chunkSize).arrayBuffer());
+        await write(path,{action:'append',id:start.id,offset:offset,data:btoa(String.fromCharCode.apply(null,bytes))});
+       }
+       var preview=await write(path,{action:'inspect',id:start.id});
+       var accounts=preview.accounts||[];
+       if(!accounts.length)throw new Error(t('No accounts found in the backup.'));
+       if(!window.confirm(t('Import these accounts? Existing sign-ins with the same email will be updated.')+'\n\n'+accounts.map(function(a){return a.email;}).join('\n')))return;
+       var result=await write(path,{action:'import',id:start.id});
+       file.value='';
+       await showAccounts();
+       note(t('Accounts imported')+' · '+(result.added+result.updated),false,anchor);
+      });
+     })
+    ])
+   ]);
+  }
   function signinForm(){
    var email=E('input',{type:'email',placeholder:t('Email'),autocomplete:'username'});
    var password=E('input',{type:'password',placeholder:t('Password'),autocomplete:'current-password'});
    var answer=E('input',{type:'text',placeholder:t('Verification code or answer'),autocomplete:'one-time-code'});
    var result=E('div',{'class':'ff-signin-state'});
+   var browserRequest=E('div',{'class':'ff-signin-state',role:'status'});
+   var browserTimer,signInStarting=false;
+   function endBrowserRequest(){
+    window.clearTimeout(browserTimer);
+    delete browserRequest.dataset.ffvpnBrowserRequest;
+    delete browserRequest.dataset.ffvpnBrowserReady;
+   }
+   var browserButton=button('Sign in with Mozilla in your browser',function(){
+    if(location.protocol!=='https:')throw new Error(t('Open LuCI over HTTPS to sign in with the browser.'));
+    if(signup||signInStarting||browserRequest.dataset.ffvpnBrowserRequest)throw new Error(t('A sign-in is already in progress.'));
+    var nonce=Array.from(crypto.getRandomValues(new Uint8Array(16)),function(b){return b.toString(16).padStart(2,'0');}).join('');
+    browserRequest.dataset.ffvpnBrowserRequest=nonce;
+    browserRequest.dataset.ffvpnBrowserReady='1';
+    browserRequest.textContent=t('Click the FFVPN extension icon in this tab to open Mozilla.');
+    browserTimer=window.setTimeout(function(){
+     endBrowserRequest();
+     browserRequest.textContent=t('Browser sign-in expired. Start again.');
+    },15*60*1000);
+   });
+   browserRequest.addEventListener('ffvpn-browser-signin',function(event){
+    if(!browserRequest.dataset.ffvpnBrowserRequest||!browserRequest.isConnected)return;
+    var response=event.detail||{};
+    switch(response.kind){
+     case 'opened':
+      if(!browserRequest.dataset.ffvpnBrowserReady)return;
+      event.preventDefault();
+      delete browserRequest.dataset.ffvpnBrowserReady;
+      browserRequest.textContent=t('Complete sign-in and any verification in the Mozilla tab.');
+      break;
+     case 'closed':
+     case 'failed':
+      event.preventDefault();
+      endBrowserRequest();
+      browserRequest.textContent=t(response.kind==='closed'?'The Mozilla tab was closed.':'Could not open Mozilla. Try again.');
+      break;
+     case 'session':
+      var account=response.account||{};
+      if(signup||signInStarting||typeof account.email!=='string'||!(/^[0-9a-f]{64}$/).test(account.token||''))return;
+      event.preventDefault();
+      endBrowserRequest();
+      signInStarting=true;
+      browserRequest.textContent=t('Complete any remaining verification in the Mozilla tab.');
+      write('/signin/browser',{email:account.email,session_token:account.token}).then(function(s){
+       if(!s.id)throw new Error(t('The installed core does not support browser sign-in.'));
+       keepSignin(s.id);
+       return watch();
+      }).catch(function(e){note(errorMessage(e.message),true,browserRequest);}).finally(function(){signInStarting=false;});
+    }
+   });
    function watch(){
     if(!signup)return Promise.resolve();
     return callAPI('/signin/'+encodeURIComponent(signup)).then(function(s){
@@ -258,13 +358,15 @@ return view.extend({
      var errors={wrong_password:'Incorrect Mozilla account password.',no_password:'This account needs a Mozilla password; set it on the official account website.',no_account:'No Mozilla account exists with this email.',too_many_attempts:'Too many attempts. Wait before trying again.',wrong_code:'Wrong or expired verification code.',wrong_totp:'Wrong or expired verification code.',unblock_code_rejected:'Wrong or expired verification code.',too_many_codes:'Wrong or expired verification code.',timed_out:'Sign-in timed out. Please start again.',network:'Cannot reach Mozilla. Check the connection settings.'};
      result.textContent=t(steps[s.step]||s.message||s.step);
      if(s.error)result.textContent+=' · '+(errors[s.error_code]?t(errors[s.error_code]):s.error);
-     if(s.step==='done'){keepSignin(null);return showAccounts();}
-     if(['failed','cancelled'].indexOf(s.step)>=0){keepSignin(null);return;}
+     if(s.step==='done'){keepSignin(null);browserRequest.textContent='';return showAccounts();}
+     if(['failed','cancelled'].indexOf(s.step)>=0){keepSignin(null);browserRequest.textContent='';return;}
      if(s.step==='working')window.setTimeout(function(){if(result.isConnected)watch().catch(function(e){note(e.message,true);});},1500);
     });
    }
    var signInButton=button('Sign in',function(){
-    return write('/signin',{email:email.value,password:password.value}).then(function(s){password.value='';keepSignin(s.id);result.textContent=t('Signing in');return watch();});
+    if(signup||signInStarting||browserRequest.dataset.ffvpnBrowserRequest)throw new Error(t('A sign-in is already in progress.'));
+    signInStarting=true;
+    return write('/signin',{email:email.value,password:password.value}).then(function(s){password.value='';keepSignin(s.id);result.textContent=t('Signing in');return watch();}).finally(function(){signInStarting=false;});
    });signInButton.classList.add('primary');
    var continueButton=button('Continue',function(){
     if(!signup)return;
@@ -273,27 +375,51 @@ return view.extend({
    if(signup)window.setTimeout(function(){watch().catch(function(e){note(e.message,true);});},0);
    return card('Sign in',[
     E('a',{'class':'mk-link',href:'https://accounts.firefox.com/',target:'_blank',rel:'noopener noreferrer'},t('Create a Mozilla account')),
+    E('div',{'class':'ff-actions'},[browserButton,E('a',{'class':'mk-link',href:L.resource('ffvpn/browser-signin.zip'),download:'ffvpn-browser-signin.zip'},t('Download the FFVPN browser extension'))]),
+    E('p',{'class':'mk-muted'},t('Extract the extension and load its folder with Load unpacked in Chrome or Edge.')),
+    browserRequest,
     E('div',{'class':'ff-form-row'},[E('label',{},[E('span',{},t('Email')),email]),E('label',{},[E('span',{},t('Password')),password]),signInButton]),result,
-    E('div',{'class':'ff-form-row'},[E('label',{},[E('span',{},t('Verification code or answer')),answer]),E('div',{'class':'ff-actions'},[continueButton,button('Cancel',function(){if(signup)return write('/signin/'+encodeURIComponent(signup),{},'DELETE').then(function(){keepSignin(null);result.textContent='';});})])])
+    E('div',{'class':'ff-form-row'},[E('label',{},[E('span',{},t('Verification code or answer')),answer]),E('div',{'class':'ff-actions'},[continueButton,button('Cancel',function(){
+     if(signInStarting&&!signup)throw new Error(t('A sign-in is already in progress.'));
+     endBrowserRequest();
+     browserRequest.textContent='';
+     if(signup)return write('/signin/'+encodeURIComponent(signup),{},'DELETE').then(function(){keepSignin(null);result.textContent='';});
+    })])])
    ]);
   }
   function baseOptions(connection){
 
     return callAPI('/settings').then(checked).then(function(r){
      function change(section,key,value){
-      return callAPI('/settings').then(checked).then(function(latest){
+      settingsSave=settingsSave.then(function(){return callAPI('/settings');}).then(checked).then(function(latest){
        var cfg=latest.config;cfg[section][key]=value;
        cfg.dashboard.listen='127.0.0.1:10820';
        cfg.system_proxy.mode='clear';cfg.routing.enabled=false;
        return write('/settings',{config:cfg},'PUT');
       }).then(function(){note(t('Saved'));}).catch(function(e){note(e.message,true);});
+      return settingsSave;
      }
-     var relay=E('input',{type:'url',value:r.config.network.api_relay||'',placeholder:'https://',change:function(){change('network','api_relay',relay.value);}});
-     connection.appendChild(E('div',{'class':'ff-connection-grid'},[
-      E('label',{'class':'ff-setting-field'},[E('span',{},t('Connection protocol')),select([['h2','HTTP/2'],['h3','HTTP/3']],r.config.proxy.transport,function(v){change('proxy','transport',v);})]),
+     var network=r.config.network, proxy=r.config.proxy;
+     var protocols=[['h2','HTTP/2'],['h3','HTTP/3']];
+     if(proxy.ip_version!==undefined)protocols.push(['h1','HTTP/1.1']);
+     var relay=E('input',{type:'url',value:network.api_relay||'',placeholder:'https://',change:function(){change('network','api_relay',relay.value);}});
+     var fields=[
+      E('label',{'class':'ff-setting-field'},[E('span',{},t('Connection protocol')),select(protocols,proxy.transport,function(v){change('proxy','transport',v);})]),
       E('div',{'class':'ff-setting-field'},[fragmentationHelp(),(function(){var field=select([['off','Off'],['sni','SNI'],['first-byte','First byte'],['record','TLS record']],r.config.network.hello_split||'off',function(v){change('network','hello_split',v);});field.id='ff-fragmentation';return field;})()]),
       E('label',{'class':'ff-setting-field'},[E('span',{},t('Relay server')),relay])
-     ]));
+     ];
+     if(proxy.ip_version!==undefined){
+      var families=[['auto',t('Automatic (IPv4 first)')],['dual',t('Dual stack')],['ipv6_first',t('IPv6 first')],['ipv4',t('IPv4 only')],['ipv6',t('IPv6 only')]];
+      fields.push(E('label',{'class':'ff-setting-field'},[E('span',{},t('Mozilla connection IP version')),select(families,proxy.ip_version||'auto',function(v){change('proxy','ip_version',v);})]));
+     }
+     [['api_relay_enabled','Use personal relay'],['shared_relay_enabled','Use shared relay for HTTP 451']].forEach(function(item){
+      if(network[item[0]]===undefined)return;
+      var toggle=E('input',{type:'checkbox'});
+      toggle.checked=network[item[0]];
+      toggle.addEventListener('change',function(){change('network',item[0],toggle.checked);});
+      fields.push(E('label',{'class':'ff-setting-row'},[E('span',{},t(item[1])),toggle]));
+     });
+     connection.appendChild(E('div',{'class':'ff-connection-grid'},fields));
      var clock=button('Set router clock',function(anchor){return callClock(Math.floor(Date.now()/1000)).then(checked).then(function(r){note(t(r.already?'Router clock is already configured.':'Router clock configured'),false,anchor);});});clock.classList.add('primary');clock.prepend(icon('Updates'));connection.appendChild(E('div',{'class':'ff-setting-row ff-clock-row'},[clock]));
     });
   }
@@ -330,7 +456,7 @@ return view.extend({
     var basic=card('Basic settings',[masterCard,engines,E('div',{'class':'ff-actions'},available.length?[integrationTarget,integrationButton]:[E('p',{},t('Whole-network routing requires PassWall2 or Zirgozar.'))]),E('p',{},t('Whole-network routing requires PassWall2 or Zirgozar.'))]);content.appendChild(basic);baseOptions(basic).catch(function(e){note(e.message,true,basic);});
    }else if(tab==='Accounts'){
     content.appendChild(E('p',{},t('Multiple Mozilla accounts are supported. Accounts are tried in priority order when quota runs low.')));
-    accountBox=E('div');var addForm=signinForm();addForm.hidden=!signup;var addButton=button('Add user',function(){addForm.hidden=false;addForm.querySelector('input').focus();});addButton.classList.add('primary');content.appendChild(addButton);content.appendChild(accountBox);content.appendChild(addForm);
+    accountBox=E('div');var addForm=signinForm();addForm.hidden=!signup;var addButton=button('Add user',function(){addForm.hidden=false;addForm.querySelector('input').focus();});addButton.classList.add('primary');content.appendChild(addButton);content.appendChild(backupActions());content.appendChild(accountBox);content.appendChild(addForm);
     return showAccounts();
    }else if(tab==='Servers'){
     var locations=E('div',{'class':'ff-server-list'});content.appendChild(E('div',{'class':'ff-actions'},[
@@ -351,6 +477,7 @@ return view.extend({
      return callUpdate(component,action).then(checked).then(status).catch(function(e){updatePending=null;root.querySelectorAll('[data-update]').forEach(function(el){el.disabled=false;el.ffBusy=false;el.classList.remove('mk-running');});throw e;});
     });b.dataset.update=component;b.dataset.action=action;b.classList.add('mk-small',action==='check'?'soft-blue':action==='update'?'success':'primary');b.prepend(icon(action==='check'?'Updates':'Download'));return b;}
     content.appendChild(E('p',{},t('The complete release archive is downloaded and verified before installation.')));
+    content.appendChild(card('Update FFVPN and core',[E('div',{'class':'ff-update-message',role:'status'}),updateButton('Update now','all','update')]));
     ['app','core'].forEach(function(component){
      updateVersions[component]=E('p',{});
      content.appendChild(card(component==='app'?'ffvpn':'Core',[E('div',{'class':'ff-update-row'},[
