@@ -13,58 +13,68 @@ An unofficial client for Firefox's built-in VPN on OpenWrt, with an integrated L
 
 [Website and source](https://github.com/dreamboxone/ffvpn) · [Telegram support](https://t.me/routekernel1)
 
-## Features
+## Requirements
 
-- Integrated LuCI installation, four languages, light/dark/router themes and tab icons.
-- Multiple Mozilla accounts, priority order, quota display and automatic account switching.
-- Immediate settings and a sliding power switch; no Save & Apply.
-- Detect Zirgozar and PassWall2; warn before routing changes and restore owned settings on disable, preserving later manual edits.
-- Separate application/core update checks, updates and reinstalls, with core path and free space.
-- Signed releases with complete archive downloads and SHA-256 verification.
-- Tehran timezone and Iranian time servers, matching Zirgozar.
+- OpenWrt 23.05, 24.10 or 25.12 on a [supported architecture](build/architectures.json). OpenWrt 25.12.6 has been tested on router hardware.
+- SSH access for the initial install, access to GitHub from the router and a Mozilla account. The installer adds LuCI and other required dependencies when missing.
+- Recommended free space is 32 MB on flash and 64 MB for temporary files, with at least 256 MB of total RAM. The app and core occupy about 15–20 MB, depending on architecture. Missing dependencies and routing engines need additional resources.
+- Use Zirgozar or PassWall2 for whole-network routing. Clients can also use the standalone SOCKS proxy.
 
-## Installation
+## Install
 
-Targets OpenWrt 23.05, 24.10 and 25.12. LuCI is required; Zirgozar or PassWall2 is optional for whole-network routing.
-
-Run on the router over SSH:
+Run this command over SSH on the router.
 
 ```sh
 wget -qO /tmp/ffvpn-install.sh https://raw.githubusercontent.com/dreamboxone/ffvpn/main/install.sh && sh /tmp/ffvpn-install.sh
 ```
 
-## Install, remove and device requirements
+Choose **1 (Install / Repair)**. The installer detects the router architecture, downloads the matching release and verifies its signature and file hashes. Open **LuCI → Services → ffvpn**. On a fresh installation, the main switch stays off until you enable it.
 
-The installer detects the router's OpenWrt release and architecture and downloads the matching files. Targets: OpenWrt 23.05, 24.10 and 25.12; hardware-tested on 25.12.6. See [architectures.json](build/architectures.json).
+## Add a Mozilla account
 
-**Install or remove with the same command:** the command above opens `1) Install`, `2) Update`, `3) Remove`. To uninstall, run it again and choose **3**. Account data is retained and owned routing changes are restored.
+Open **Accounts → Add user**, enter your Mozilla email and password, and complete any verification prompts. You can add multiple accounts, reorder their priority, refresh quotas and temporarily disable accounts. FFVPN can switch accounts automatically as quota runs low.
 
-**Flash:** approximately 15–20 MB for the application and core, plus missing dependencies. Allow at least 32 MB free flash and 64 MB free temporary storage. Binary size varies by architecture.
+### Sign in with your browser
 
-**RAM:** recommended minimum 256 MB total router RAM; a hard minimum on low-memory devices has not been validated. The test router measured about 18 MB resident core memory and a 42 MB observed peak. Zirgozar or PassWall2 requires additional memory.
+1. Open the router's local LuCI address over HTTPS in Chrome or Edge, then select **Accounts → Add user**.
+2. Download and extract the FFVPN extension from the form. Enable Developer mode at `chrome://extensions` or `edge://extensions`, then select the extracted folder with **Load unpacked**. Install the extension once per browser profile.
+3. Choose **Sign in with Mozilla in your browser**, then click the extension icon in the same LuCI tab. Enter the password and complete any codes or CAPTCHA in Mozilla's tab. Leave that tab open through verification, then check LuCI for the result.
 
-Standalone SOCKS works without a routing engine: router LAN address, port `10810`, no username/password by default, LAN access only. The management API remains loopback-only. For whole-network routing, select either Zirgozar or PassWall2 in Basic settings, then apply settings; Restore settings reverses these changes.
+The browser needs access to Mozilla's sign-in page for this method.
 
-Choose Install, Update or Remove. Open LuCI → Services → ffvpn and add a Mozilla account. Installation leaves routing disabled. Removal retains account data.
+### Back up or move accounts
 
-## Core and limitations
+Under **Accounts → Account backup**, select **Export backup** to download a ZIP of accounts and core settings. Keep the ZIP private because it contains sign-in credentials. To move accounts, choose a ZIP from FFVPN or Arman VPN, review the account list and confirm the import. Accounts with matching email addresses receive the imported credentials. The router keeps its current settings.
 
-The core derives from [arman-vpn-client](https://github.com/armanlife/arman-vpn-client), with an OpenWrt entry point. Mozilla updates its service; compatible core builds are distributed through ffvpn releases. Updates download the complete release archive and verify its signature and file hashes.
+## Connect and route traffic
 
-### Browser sign-in
+- **Single device or app.** Turn on the main switch and configure SOCKS5 with the router's LAN address and port `10810`. LAN clients can access it without a username or password by default. WAN access is blocked and the management API listens on loopback.
+- **Whole network.** Under **Home → Basic settings**, select Zirgozar or PassWall2 and choose **Apply settings**. Choose **Restore settings** to undo FFVPN's routing changes.
+- **Connection options.** Use **Servers** to pick a country or measure latency. In Basic settings, choose HTTP/2, HTTP/3 or HTTP/1.1, and set the IP preference for connections to Mozilla's proxy. HTTP/2 and automatic IPv4-first selection are the defaults.
+- **TLS fragmentation and clock.** Basic settings includes help beside the TLS fragmentation control. **Set router clock** sets the router's timezone to Tehran and adds Iranian time servers.
+- **Relays.** Personal and shared relay switches are independent. When no personal relay is active, shared relays can handle Guardian control requests after HTTP 451. VPN traffic travels through Mozilla's tunnel.
 
-1. Open the router's local LuCI address over HTTPS in Chrome or Edge and select **Accounts → Add user**.
-2. Download and extract the FFVPN extension from that form. Enable Developer mode at `chrome://extensions` or `edge://extensions`, then select the extracted folder with **Load unpacked**.
-3. Select **Sign in with Mozilla in your browser**, then click the extension icon in that LuCI tab. Complete sign-in and verification in Mozilla's tab. LuCI shows the result.
+## Update or remove
 
-Not affiliated with or endorsed by Mozilla. Account quotas and availability are controlled by Mozilla. TCP is limited to ports 80, 443, 8080 and 8443; UDP also has port restrictions. Some calls, games and SSH connections may fail. The management API is loopback-only; SOCKS is available to LAN devices and blocked from WAN.
+- **Upgrade from 1.0.2 to 1.0.3.** Run the installation command again over SSH and choose **2 (Update)** to upgrade both the interface and the core. To upgrade from LuCI 1.0.2, use **Update now** in both the **ffvpn** and **Core** cards. Refresh LuCI after the update.
+- **From 1.0.3 onward.** In **Updates**, you can update both components together, or check, update and reinstall each separately. To update only the core, select **Check for updates** and then **Update now** in the **Core** card. The app and core have independent version numbers. Updating may briefly interrupt the connection.
+- FFVPN publishes OpenWrt-compatible core builds in its own signed releases. A core update becomes available in LuCI when FFVPN publishes the corresponding package. The updater downloads the complete archive and verifies its signature and SHA-256 hashes.
+- To remove a script installation, run the command again and choose **3 (Remove)**. FFVPN restores its routing changes and leaves account data in `/etc/ffvpn/core`.
 
-## Licenses
+## Troubleshooting
 
-The interface and ffvpn utilities use AGPL-3.0-or-later. The upstream core retains its GPL-3.0 license. Theme and clock behavior derive from [Zirgozar](https://github.com/dreamboxone/zirgozar). Vazirmatn includes its font license. See [UPSTREAM.json](UPSTREAM.json) for pinned revisions.
-
-ffvpn · Copyright © 2026 dreamboxone · GNU AGPLv3 · No warranty
+- **HTTP 406 during sign-in or renewal.** Check the installed core in **Updates**. FFVPN 1.0.3 ships with core 1.0.17, which has a fallback for sign-in and renewal. If the error recurs, check the router clock and **Logs**.
+- **HTTP 451 from Guardian.** Check the personal and shared relay switches in Basic settings. An active personal relay takes priority.
+- **Update fails.** Open the details in **Updates** and check the router's GitHub access and available space. Use **1 (Install / Repair)** in the SSH installer to repair an incomplete installation.
 
 ## OpenWrt packages
 
-Each architecture has one integrated application and LuCI package in [Releases](https://github.com/dreamboxone/ffvpn/releases/latest): `ipk` for 23.05/24.10 and `apk` for 25.12. Match the router architecture. Install with `opkg install /tmp/ffvpn_1.0.2-1_ARCH.ipk` or, after verifying its detached signature, `apk add --allow-untrusted /tmp/ffvpn-1.0.2-r1-ARCH.apk`. APK files are third-party packages, not signed by the official OpenWrt repository; detached usign `.sig` files and SHA256SUMS are provided. The one-line installer verifies signatures automatically. Remove with `opkg remove ffvpn` or `apk del ffvpn`.
+[Releases](https://github.com/dreamboxone/ffvpn/releases/latest) include integrated app and LuCI packages for each supported architecture. Use `ipk` on OpenWrt 23.05 and 24.10 and `apk` on 25.12. Match `DISTRIB_ARCH` in `/etc/openwrt_release`. For manual installation, verify the detached `.sig` with usign and the [FFVPN public release key](files/usr/share/ffvpn/release.pub) first. Then use `opkg install` with the IPK filename or `apk add --allow-untrusted` with the verified third-party APK. Use `opkg remove ffvpn` or `apk del ffvpn` to uninstall a package-manager installation.
+
+## Limits and licenses
+
+FFVPN is an unofficial client. Mozilla controls service availability and account quotas. The tunnel supports TCP ports 80, 443, 8080 and 8443 and restricts UDP ports. This can affect calls, games and SSH.
+
+The interface and utilities use AGPL-3.0-or-later. The core derives from [Arman VPN](https://github.com/armanlife/arman-vpn-client), with an OpenWrt entry point, and retains its GPL-3.0 license. The theme and clock behavior derive from [Zirgozar](https://github.com/dreamboxone/zirgozar). Vazirmatn includes its font license. See [UPSTREAM.json](UPSTREAM.json) for source revisions.
+
+ffvpn · Copyright © 2026 dreamboxone · GNU AGPLv3 · No warranty
