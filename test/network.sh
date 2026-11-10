@@ -81,3 +81,41 @@ uci export passwall2 > "$TEST/restart.after"
 cmp "$TEST/restart.before" "$TEST/restart.after"
 [ ! -f "$TEST/state/target" ]
 echo 'PASS: failed activation rolls back routing settings'
+
+cat > "$TEST/config/firewall" <<'EOF'
+config zone lan
+ option name lan
+EOF
+cp "$TEST/init/zirgozar" "$TEST/init/firewall"
+cat > "$TEST/init/ffvpn-tun" <<EOF
+#!/bin/sh
+case "\$1" in
+ start) [ ! -f "$TEST/tun-fail" ] && touch "$TEST/tun-running";;
+ stop) rm -f "$TEST/tun-running";;
+esac
+EOF
+chmod +x "$TEST/init/firewall" "$TEST/init/ffvpn-tun"
+export FFVPN_TUN_SERVICE="$TEST/init/ffvpn-tun"
+uci set ffvpn.main.integration=tun
+uci commit ffvpn
+uci export firewall > "$TEST/firewall.before"
+sh "$SOURCE" apply
+[ -f "$TEST/tun-running" ]
+[ "$(cat "$TEST/state/target")" = tun ]
+[ "$(uci get firewall.ffvpn_tun.device)" = ffvpntun ]
+[ "$(uci get firewall.ffvpn_tun_lan.src)" = lan ]
+[ "$(uci get firewall.ffvpn_tun_lan.dest)" = ffvpntun ]
+[ "$(uci get zirgozar.config.enabled)" = 0 ]
+[ "$(uci get 'passwall2.@global[0].enabled')" = 0 ]
+sh "$SOURCE" restore
+[ ! -f "$TEST/tun-running" ]
+uci export firewall > "$TEST/firewall.after"
+cmp "$TEST/firewall.before" "$TEST/firewall.after"
+echo 'PASS: standalone TUN owns only its firewall and routing changes'
+
+touch "$TEST/tun-fail"
+if sh "$SOURCE" apply; then echo 'FAIL: accepted TUN startup failure'; exit 1; fi
+uci export firewall > "$TEST/firewall.after"
+cmp "$TEST/firewall.before" "$TEST/firewall.after"
+[ ! -f "$TEST/state/target" ]
+echo 'PASS: failed TUN startup restores the firewall'

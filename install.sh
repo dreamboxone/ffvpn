@@ -77,7 +77,7 @@ remove_ffvpn() {
 	done < /tmp/ffvpn-remove-files
 	rm -f /usr/share/ffvpn/installed.manifest /usr/share/ffvpn/installed.app.manifest /usr/share/ffvpn/installed.core.manifest /usr/share/ffvpn/managed-files /usr/share/ffvpn/version /etc/config/ffvpn /tmp/ffvpn-remove-files
 	/etc/init.d/rpcd restart
-	rm -f /tmp/luci-indexcache
+	rm -f /tmp/luci-indexcache /tmp/luci-indexcache.*.json
 	/etc/init.d/uhttpd reload
 	echo 'Removed. Account data remains in /etc/ffvpn/core.'
 }
@@ -96,7 +96,7 @@ show_menu() {
 	printf ' GitHub   : https://github.com/dreamboxone/ffvpn\n'
 	printf ' OpenWrt  : %s\n Architecture: %s\n' "$DISTRIB_RELEASE" "${DISTRIB_ARCH:-Unknown}"
 	if [ -x /usr/libexec/ffvpn/update ] && [ -x /etc/init.d/ffvpn ] &&
-		[ -x "$menu_core" ] && [ -f /www/luci-static/resources/view/ffvpn/main.js ] &&
+		[ -x "$menu_core" ] && { [ -f /www/luci-static/resources/view/ffvpn/panel.js ] || [ -f /www/luci-static/resources/view/ffvpn/main.js ]; } &&
 		[ "$menu_app_version" != Unknown ]; then
 		printf ' Status   : \033[1;32mInstalled\033[0m\n'
 		printf ' Version  : %s\n Core     : %s\n' "$menu_app_version" "$menu_core_version"

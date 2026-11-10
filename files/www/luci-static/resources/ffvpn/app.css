@@ -186,6 +186,9 @@
 .ffvpn .ff-setting-field{padding-block:0;gap:14px}
 .ffvpn .ff-setting-field>span{flex:0 0 130px}
 .ffvpn .ff-setting-field select,.ffvpn .ff-setting-field input{flex:0 1 420px;width:420px;max-width:100%;min-height:42px;height:42px;padding-block:8px}
+.ffvpn .ff-setting-field input[type=checkbox]{flex:none;width:18px;height:18px;min-height:0;padding:0}
+.ffvpn .ff-setting-field textarea{flex:0 1 420px;width:100%;max-width:420px;box-sizing:border-box;resize:vertical}
+@media(max-width:700px){.ffvpn .ff-setting-field textarea{flex:none}}
 .ffvpn .ff-clock-row{margin-top:22px;margin-bottom:0}
 @media(max-width:700px){.ffvpn .ff-setting-field>span{flex-basis:auto}.ffvpn .ff-setting-field select,.ffvpn .ff-setting-field input{flex:0 0 auto;width:100%;max-width:420px}.ffvpn .ff-setting-field{gap:8px}}
 

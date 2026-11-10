@@ -42,8 +42,10 @@ type Config struct {
 	// BlockIPv6 refuses IPv6 outside the device when it has none (Linux:
 	// an unreachable rule with the routes; elsewhere the caller's filters).
 	BlockIPv6 bool
-	MTU       uint32
-	Handler   Handler
+	// ManualRoutes leaves policy routing and DNS to the router integration.
+	ManualRoutes bool
+	MTU          uint32
+	Handler      Handler
 }
 
 // Handler receives the device's flows. UDP to port 53 (to any address) is
@@ -180,7 +182,7 @@ type Device struct {
 // Open creates the adapter with its addresses and DNS server (the
 // address after Inet4's), without routes.
 func Open(cfg Config) (*Device, error) {
-	if cfg.Handler.DNS == nil || cfg.Handler.TCP == nil {
+	if cfg.Handler.TCP == nil || (cfg.Handler.DNS == nil && !cfg.ManualRoutes) {
 		return nil, errors.New("tunstack: the handler is incomplete")
 	}
 	finder := control.NewDefaultInterfaceFinder()
@@ -201,6 +203,10 @@ func Open(cfg Config) (*Device, error) {
 		InterfaceFinder:  finder,
 		InterfaceMonitor: monitor,
 		Logger:           singLogger{},
+	}
+	if cfg.ManualRoutes {
+		options.AutoRoute = false
+		options.DNSMode = tun.DNSModeDisabled
 	}
 	if cfg.Inet6.IsValid() {
 		options.Inet6Address = []netip.Prefix{cfg.Inet6}
@@ -288,7 +294,7 @@ func (h *handler) JudgeFlow(network uint8, source, destination netip.AddrPort, _
 	switch {
 	case network == protocolTCP:
 		return tun.FlowVerdict{Action: tun.ActionAccept}
-	case network == protocolUDP && destination.Port() == 53:
+	case network == protocolUDP && destination.Port() == 53 && h.h.DNS != nil:
 		return tun.FlowVerdict{Action: tun.ActionHijackDNS}
 	case network == protocolUDP && h.h.TakeUDP != nil && h.h.UDP != nil && h.h.TakeUDP(source, destination):
 		return tun.FlowVerdict{Action: tun.ActionAccept}

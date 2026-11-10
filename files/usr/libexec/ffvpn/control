@@ -15,6 +15,10 @@ core_power() {
 	token=$(cat /etc/ffvpn/core/local-api.token)
 	printf '{"on":%s,"auto":true}' "$1" | curl -fsS --max-time 10 -H "X-Local-Token: $token" -H 'Content-Type: application/json' --data-binary @- http://127.0.0.1:10820/api/power >/dev/null
 }
+restart_tun() {
+	/usr/libexec/ffvpn/ffvpn-tun stop &&
+		/usr/libexec/ffvpn/ffvpn-tun start
+}
 enable_proxy() {
 	/usr/libexec/ffvpn/proxy configure
 	core_power true
@@ -41,8 +45,11 @@ case ${1:-} in
 		;;
 	integrate)
 		target=${2:-}
-		case "$target" in zirgozar|passwall2) ;; *) echo 'Choose Zirgozar or PassWall2.' >&2; exit 2;; esac
-		[ -x "/etc/init.d/$target" ] || { echo 'The selected routing engine is not installed.' >&2; exit 1; }
+		case "$target" in
+			tun) ;;
+			zirgozar|passwall2) [ -x "/etc/init.d/$target" ] || { echo 'The selected routing engine is not installed.' >&2; exit 1; };;
+			*) exit 2;;
+		esac
 		current=$(cat /etc/ffvpn/network-state/target 2>/dev/null || true)
 		[ "$current" != "$target" ] || { echo 'Routing is already configured.'; exit 0; }
 		[ -z "$current" ] || { echo 'Restore the current routing engine before selecting another.' >&2; exit 1; }
@@ -73,10 +80,29 @@ case ${1:-} in
 		echo 'Previous routing settings restored.'
 		;;
 	mode)
-		case ${2:-} in auto|passwall2|zirgozar) ;; *) exit 2;; esac
+		case ${2:-} in auto|passwall2|zirgozar|tun) ;; *) exit 2;; esac
 		[ "$(uci -q get ffvpn.main.enabled)" != 1 ] || { echo 'Turn ffvpn off before changing routing mode.' >&2; exit 1; }
 		uci set "ffvpn.main.integration=$2"
 		uci commit ffvpn
+		;;
+	tun_mtu)
+		mtu=${2:-}
+		case "$mtu" in [1-9][0-9][0-9][0-9]) ;; *) mtu=0;; esac
+		[ "$mtu" -ge 1280 ] && [ "$mtu" -le 9000 ] || { echo 'TUN MTU must be between 1280 and 9000.' >&2; exit 2; }
+		[ -z "$(uci -q changes ffvpn)" ] || { echo 'Unsaved FFVPN changes exist.' >&2; exit 1; }
+		previous=$(uci -q get ffvpn.main.tun_mtu || echo 1500)
+		[ "$previous" != "$mtu" ] || exit 0
+		active=$(cat /etc/ffvpn/network-state/target 2>/dev/null || true)
+		uci set "ffvpn.main.tun_mtu=$mtu"
+		if { [ "$active" != tun ] || restart_tun; } && uci commit ffvpn; then
+			exit 0
+		fi
+		uci revert ffvpn.main.tun_mtu
+		if [ "$active" = tun ]; then
+			restart_tun || { echo 'Could not restart standalone TUN with its previous MTU.' >&2; exit 1; }
+		fi
+		echo 'Could not apply the MTU. The previous MTU was restored.' >&2
+		exit 1
 		;;
 	directory)
 		directory=${2:-/usr/bin}

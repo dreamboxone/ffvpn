@@ -17,6 +17,7 @@
     "luci.ffvpn": [
      "power",
      "mode",
+     "tun_mtu",
      "directory",
      "clock",
      "update",

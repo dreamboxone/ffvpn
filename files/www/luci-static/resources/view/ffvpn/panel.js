@@ -7,6 +7,7 @@
 'require ffvpn.theme as themeUI';
 'require ffvpn.flags as flags';
 'require ffvpn.logs as logText';
+'require ffvpn.advanced as advanced';
 
 var callStatus = rpc.declare({object:'luci.ffvpn', method:'status', expect:{}});
 var callConnectionCheck=rpc.declare({object:'luci.ffvpn',method:'connection_check',params:['site'],expect:{}});
@@ -18,6 +19,7 @@ var callAPI = rpc.declare({object:'luci.ffvpn', method:'api', params:['path'], e
 var callWrite = rpc.declare({object:'luci.ffvpn', method:'api_write', params:['method','path','body'], expect:{}});
 var callPower = rpc.declare({object:'luci.ffvpn', method:'power', params:['enabled','confirmed'], expect:{}});
 var callMode = rpc.declare({object:'luci.ffvpn', method:'mode', params:['value'], expect:{}});
+var callTunMTU = rpc.declare({object:'luci.ffvpn', method:'tun_mtu', params:['value'], expect:{}});
 var callDirectory = rpc.declare({object:'luci.ffvpn', method:'directory', params:['value'], expect:{}});
 var callClock = rpc.declare({object:'luci.ffvpn', method:'clock', params:['now'], expect:{}});
 var callUpdate = rpc.declare({object:'luci.ffvpn', method:'update', params:['component','action'], expect:{}});
@@ -33,6 +35,19 @@ function errorMessage(message){
 }
 function checked(result) { if (result && result.error) throw new Error(result.error); return result || {}; }
 function write(path, body, method) { return callWrite(method || 'POST', path, JSON.stringify(body || {})).then(checked); }
+function getSettings() {
+ return write('/settings',{},'GET').then(function(r){
+  if(!r.config||!r.config.network||!r.config.proxy)throw new Error(t('Could not read the core settings. Check the FFVPN service.'));
+  return r.config;
+ });
+}
+function compareVersions(candidate,installed) {
+ var pattern=/^\d+\.\d+\.\d+$/;
+ if(!pattern.test(candidate)||!pattern.test(installed))return null;
+ var a=candidate.split('.').map(Number),b=installed.split('.').map(Number);
+ for(var i=0;i<3;i++)if(a[i]!==b[i])return a[i]>b[i]?1:-1;
+ return 0;
+}
 function note(message, error, anchor) {
  if(!anchor)anchor=document.querySelector('.ffvpn main');
  if(!anchor)return;
@@ -103,6 +118,7 @@ function icon(name) {
  paths.Sun='M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5';
  paths.Moon='M21 12.8A9 9 0 0 1 11.2 3 9 9 0 1 0 21 12.8Z';
  paths.Download='M4 17v4h16v-4';
+ paths.Clock='M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0M12 7v5l3 2';
  paths.Globe='M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0M3 12h18M12 3a18 18 0 0 1 0 18 18 18 0 0 1 0-18';
  paths.Router='M3 10h18v10H3zM7 6V2M17 6V2M7 15h.01M11 15h.01M15 15h2';
  paths.Chart='M3 3v18h18M7 17v-5M12 17V7M17 17v-9';
@@ -137,7 +153,14 @@ return view.extend({
   var lastCountry=null;try{lastCountry=JSON.parse(localStorage.getItem('ffvpn-last-country'));}catch(e){}
   function rememberCountry(code,name){if(!/^[A-Z]{2}$/.test(String(code||'').toUpperCase()))return;lastCountry={code:String(code).toUpperCase(),name:name||code};try{localStorage.setItem('ffvpn-last-country',JSON.stringify(lastCountry));}catch(e){}}
   var masterCard=E('div',{'class':'ff-power ff-basic-power'},[E('label',{'class':'ff-switch'},[power,E('span',{'class':'ff-slider'})]),E('strong',{},t('Main Switch'))]);
-  var integrationButton=null,integrationTarget=null,integrationPending=false,settingsSave=Promise.resolve();
+  var integrationButton=null,integrationTarget=null,integrationPending=false,tunOptions=null,tunStatus=null,settingsSave=Promise.resolve();
+  var routingLabels={zirgozar:'Zirgozar',passwall2:'PassWall2',tun:'Standalone TUN'};
+  function refreshTunOptions(){
+   if(!tunOptions||!integrationTarget)return;
+   tunOptions.hidden=!!state.target?state.target!=='tun':integrationTarget.value!=='tun';
+   var active=state.tun_active_mtu;
+   tunStatus.textContent=state.target==='tun'?(active?t('Active TUN MTU')+' · '+active:t('TUN is not running. Check the router log.')):'';
+  }
   var refreshLogPage=null;
   var updateText=null, updateVersions={}, updatePending=null, homeFields={}, usagePeriod='today', usageData=null;
   function line(label,key){var node=E('bdi',{dir:'auto'},'—');homeFields[key]=node;return E('div',{'class':'pwp-detail-row ff-detail-row'},[E('span',{},t(label)),node]);}
@@ -162,7 +185,7 @@ return view.extend({
     if(!root.isConnected)return;
     if(current==='Logs'&&refreshLogPage)refreshLogPage().catch(function(){});
     state=values[0]; var core=values[1], s=core.state||{};
-    if(integrationButton){var active=!!state.target;integrationButton.textContent=t(active?'Restore settings':'Apply settings')+(active?'':': '+(integrationTarget.value==='zirgozar'?t('Zirgozar'):'PassWall2'));integrationButton.disabled=!!state.busy||integrationPending;integrationButton.classList.toggle('mk-running',!!state.busy);integrationTarget.disabled=active||!!state.busy;if(state.control_error)note(t(state.control_error),true,integrationButton);}
+    if(integrationButton){var active=!!state.target;integrationButton.textContent=t(active?'Restore settings':'Apply settings')+(active?'':' · '+t(routingLabels[integrationTarget.value]||'Standalone TUN'));integrationButton.disabled=!!state.busy||integrationPending;integrationButton.classList.toggle('mk-running',!!state.busy);integrationTarget.disabled=active||!!state.busy;if(state.control_error)note(t(state.control_error),true,integrationButton);refreshTunOptions();}
     power.checked=state.busy?!!state.desired:!!state.enabled;power.disabled=!!state.busy;
     var text={running:'Running',off:'Off',starting:'Starting',error:'Error',waiting:'Connecting'}[s.phase]||'Starting';
     if(s.code==='no_accounts'||s.code==='no_usable_account')text='Waiting for an account';
@@ -192,18 +215,27 @@ return view.extend({
    });
   }
   function refreshUpdateStatus(){
-   return callUpdateStatus().then(function(r){
+   return callUpdateStatus().then(checked).then(function(r){
      if(current!=='Updates'||!updateText)return;
      updateText.textContent=r.message||t('No update has been run yet.');
+     var comparisons={};
      ['app','core'].forEach(function(c){if(updateVersions[c]){
       var installed=r[c+'_version']||'—',latest=r[c+'_latest'];
-      updateVersions[c].replaceChildren(E('bdi',{'class':'mk-chip ok ff-version-chip',dir:'ltr'},'【 '+installed+' 】'),latest?(latest===installed?E('span',{'class':'mk-muted'},t('Up to date')):E('bdi',{'class':'mk-chip info ff-version-chip',dir:'ltr'},(i18n.get()==='fa'?'← ':'→ ')+latest)):E('span',{'class':'mk-muted'},t('Not checked')));
+      var order=compareVersions(latest,installed);
+      comparisons[c]=order;
+      updateVersions[c].replaceChildren(E('bdi',{'class':'mk-chip ok ff-version-chip',dir:'ltr'},'【 '+installed+' 】'),
+       order===1?E('bdi',{'class':'mk-chip info ff-version-chip',dir:'ltr'},(i18n.get()==='fa'?'← ':'→ ')+latest):
+        E('span',{'class':'mk-muted'},t(order===0?'Up to date':'Not checked')));
      }});
      var busy=!!r.busy||(updatePending&&Date.now()-updatePending.time<1500);
      if(!busy)updatePending=null;
      root.querySelectorAll('[data-update]').forEach(function(b){
       var active=busy&&((r.component||updatePending&&updatePending.component)===b.dataset.update)&&((r.action||updatePending&&updatePending.action)===b.dataset.action);
-      b.ffBusy=busy;b.disabled=busy;b.classList.toggle('mk-running',!!active);
+      var order=comparisons[b.dataset.update];
+      var downgrade=b.dataset.update==='all'?(comparisons.app===-1||comparisons.core===-1):order===-1;
+      b.ffBusy=busy;
+      b.disabled=busy||(b.dataset.action!=='check'&&downgrade)||(b.dataset.action==='update'&&order===0);
+      b.classList.toggle('mk-running',!!active);
       if(r.component===b.dataset.update&&r.action===b.dataset.action&&(busy||r.result)){var failed=!busy&&r.result!=='0';note(busy?t(r.action==='check'?'Checking version':'Updating files'):failed?t('The operation failed. Check the router connection and try again.'):t(r.action==='check'?'Version check complete':'Update complete'),!!failed,b);}
      });
      updateText.style.display=!busy&&r.result&&r.result!=='0'&&r.message?'':'none';
@@ -375,7 +407,7 @@ return view.extend({
    if(signup)window.setTimeout(function(){watch().catch(function(e){note(e.message,true);});},0);
    return card('Sign in',[
     E('a',{'class':'mk-link',href:'https://accounts.firefox.com/',target:'_blank',rel:'noopener noreferrer'},t('Create a Mozilla account')),
-    E('div',{'class':'ff-actions'},[browserButton,E('a',{'class':'mk-link',href:L.resource('ffvpn/browser-signin.zip'),download:'ffvpn-browser-signin.zip'},t('Download the FFVPN browser extension'))]),
+    E('div',{'class':'ff-actions'},[browserButton]),
     E('p',{'class':'mk-muted'},t('Extract the extension and load its folder with Load unpacked in Chrome or Edge.')),
     browserRequest,
     E('div',{'class':'ff-form-row'},[E('label',{},[E('span',{},t('Email')),email]),E('label',{},[E('span',{},t('Password')),password]),signInButton]),result,
@@ -387,25 +419,28 @@ return view.extend({
     })])])
    ]);
   }
+  function saveSettings(edit){
+   var pending=settingsSave.then(getSettings).then(function(cfg){
+    edit(cfg);
+    return write('/settings',{config:cfg},'PUT').then(function(r){
+     if(!r.saved)throw new Error(t('Could not save the core settings.'));
+    });
+   });
+   settingsSave=pending.catch(function(){});
+   return pending;
+  }
   function baseOptions(connection){
-
-    return callAPI('/settings').then(checked).then(function(r){
+    return getSettings().then(function(cfg){
      function change(section,key,value){
-      settingsSave=settingsSave.then(function(){return callAPI('/settings');}).then(checked).then(function(latest){
-       var cfg=latest.config;cfg[section][key]=value;
-       cfg.dashboard.listen='127.0.0.1:10820';
-       cfg.system_proxy.mode='clear';cfg.routing.enabled=false;
-       return write('/settings',{config:cfg},'PUT');
-      }).then(function(){note(t('Saved'));}).catch(function(e){note(e.message,true);});
-      return settingsSave;
+      return saveSettings(function(latest){latest[section][key]=value;}).then(function(){note(t('Saved'));}).catch(function(e){note(e.message,true);});
      }
-     var network=r.config.network, proxy=r.config.proxy;
+     var network=cfg.network, proxy=cfg.proxy;
      var protocols=[['h2','HTTP/2'],['h3','HTTP/3']];
      if(proxy.ip_version!==undefined)protocols.push(['h1','HTTP/1.1']);
      var relay=E('input',{type:'url',value:network.api_relay||'',placeholder:'https://',change:function(){change('network','api_relay',relay.value);}});
      var fields=[
       E('label',{'class':'ff-setting-field'},[E('span',{},t('Connection protocol')),select(protocols,proxy.transport,function(v){change('proxy','transport',v);})]),
-      E('div',{'class':'ff-setting-field'},[fragmentationHelp(),(function(){var field=select([['off','Off'],['sni','SNI'],['first-byte','First byte'],['record','TLS record']],r.config.network.hello_split||'off',function(v){change('network','hello_split',v);});field.id='ff-fragmentation';return field;})()]),
+      E('div',{'class':'ff-setting-field'},[fragmentationHelp(),(function(){var field=select([['off','Off'],['sni','SNI'],['first-byte','First byte'],['record','TLS record']],network.hello_split||'off',function(v){change('network','hello_split',v);});field.id='ff-fragmentation';return field;})()]),
       E('label',{'class':'ff-setting-field'},[E('span',{},t('Relay server')),relay])
      ];
      if(proxy.ip_version!==undefined){
@@ -420,7 +455,7 @@ return view.extend({
       fields.push(E('label',{'class':'ff-setting-row'},[E('span',{},t(item[1])),toggle]));
      });
      connection.appendChild(E('div',{'class':'ff-connection-grid'},fields));
-     var clock=button('Set router clock',function(anchor){return callClock(Math.floor(Date.now()/1000)).then(checked).then(function(r){note(t(r.already?'Router clock is already configured.':'Router clock configured'),false,anchor);});});clock.classList.add('primary');clock.prepend(icon('Updates'));connection.appendChild(E('div',{'class':'ff-setting-row ff-clock-row'},[clock]));
+     var clock=button('Set router clock',function(anchor){return callClock(Math.floor(Date.now()/1000)).then(checked).then(function(r){note(t(r.already?'Router clock is already configured.':'Router clock configured'),false,anchor);});});clock.classList.add('primary');clock.prepend(icon('Clock'));connection.appendChild(E('div',{'class':'ff-setting-row ff-clock-row'},[clock]));
     });
   }
   function show(tab){
@@ -446,17 +481,55 @@ return view.extend({
     var usageCard=homeCard('Traffic usage','Chart','#3b82f6',[E('div',{'class':'pwp-usage-body'},[values,periods]),E('small',{},t('GB')),homeFields.rate]);usageCard.classList.add('pwp-usage-card');
     content.appendChild(E('div',{'class':'mk-grid mk-metrics pwp-status-row ff-status-row'},[statusCard,routerCard,connectionCard,usageCard]));
     var available=['zirgozar','passwall2'].filter(function(name){return (state[name]||{}).installed;});
-    integrationTarget=select(available.map(function(name){return [name,name==='zirgozar'?'Zirgozar':'PassWall2'];}),state.target||(available.indexOf(state.integration)>=0?state.integration:available[0]),function(){status();});
+    available.push('tun');
+    integrationTarget=select(available.map(function(name){return [name,routingLabels[name]];}),state.target||(available.indexOf(state.integration)>=0?state.integration:available[0]),function(){refreshTunOptions();status();});
     integrationButton=button(state.target?'Restore settings':'Apply settings',function(anchor){
      var enabled=!state.target;
-     if(enabled&&!window.confirm(t('This creates the ffvpn SOCKS node, enables the selected routing engine, disables its localhost proxy, and sets remote DNS to Cloudflare DoH. The other engine is disabled. Restore settings reverses these changes and preserves later manual edits.')))return;
+     var message=integrationTarget.value==='tun'?'Standalone TUN routes LAN traffic through FFVPN and pauses Zirgozar and PassWall2. It requires kmod-tun. Restore settings reverses these changes.':'This creates the ffvpn SOCKS node, enables the selected routing engine, disables its localhost proxy, and sets remote DNS to Cloudflare DoH. The other engine is disabled. Restore settings reverses these changes and preserves later manual edits.';
+     if(enabled&&!window.confirm(t(message)))return;
      integrationPending=true;
      return callIntegration(enabled,integrationTarget.value,true).then(checked).then(function(){note(t('Applying settings'),false,anchor);return status();}).finally(function(){integrationPending=false;});
     });integrationButton.classList.add('primary');
-    var basic=card('Basic settings',[masterCard,engines,E('div',{'class':'ff-actions'},available.length?[integrationTarget,integrationButton]:[E('p',{},t('Whole-network routing requires PassWall2 or Zirgozar.'))]),E('p',{},t('Whole-network routing requires PassWall2 or Zirgozar.'))]);content.appendChild(basic);baseOptions(basic).catch(function(e){note(e.message,true,basic);});
+    var mtu=E('input',{type:'number',min:1280,max:9000,step:1,dir:'ltr',value:state.tun_mtu||1500});
+    var saveMTU=button('Apply TUN MTU',function(anchor){
+     var value=Number(mtu.value);
+     if(!Number.isInteger(value)||value<1280||value>9000)throw new Error(t('TUN MTU must be between 1280 and 9000.'));
+     return callTunMTU(value).then(checked).then(function(r){
+      if(!r.ok)throw new Error(t('Could not apply the TUN MTU.'));
+      note(t('Saved'),false,anchor);
+      return status();
+     });
+    });
+    tunStatus=E('p',{role:'status'});
+    tunOptions=E('div',{},[
+     E('label',{'class':'ff-setting-field'},[E('span',{},t('TUN interface MTU')),mtu]),
+     E('p',{'class':'mk-muted'},t('Default 1500 bytes. Applying a new MTU briefly restarts an active TUN.')),
+     E('div',{'class':'ff-actions'},[saveMTU]),tunStatus
+    ]);
+    refreshTunOptions();
+    var basic=card('Basic settings',[masterCard,engines,E('div',{'class':'ff-actions'},[integrationTarget,integrationButton]),tunOptions]);content.appendChild(basic);baseOptions(basic).catch(function(e){note(e.message,true,basic);});
+   }else if(tab==='Settings'){
+    var panel=E('div');
+    content.appendChild(panel);
+    return getSettings().then(function(cfg){
+     if(panel.isConnected)advanced.render(panel,cfg,{save:saveSettings,read:callAPI,write:write,button:button,card:card,note:note,select:select});
+    });
    }else if(tab==='Accounts'){
     content.appendChild(E('p',{},t('Multiple Mozilla accounts are supported. Accounts are tried in priority order when quota runs low.')));
-    accountBox=E('div');var addForm=signinForm();addForm.hidden=!signup;var addButton=button('Add user',function(){addForm.hidden=false;addForm.querySelector('input').focus();});addButton.classList.add('primary');content.appendChild(addButton);content.appendChild(backupActions());content.appendChild(accountBox);content.appendChild(addForm);
+    var addForm=signinForm();
+    addForm.hidden=!signup;
+    var addButton=button('Add user',function(){
+     addForm.hidden=false;
+     addForm.querySelector('input').focus({preventScroll:true});
+    });
+    addButton.classList.add('primary');
+    var extension=E('a',{'class':'mk-btn soft-blue',href:L.resource('ffvpn/browser-signin.zip'),
+     download:'ffvpn-browser-signin.zip'},[icon('Download'),E('span',{},t('Download the FFVPN browser extension'))]);
+    accountBox=E('div');
+    content.appendChild(E('div',{'class':'ff-actions'},[addButton,extension]));
+    content.appendChild(addForm);
+    content.appendChild(backupActions());
+    content.appendChild(accountBox);
     return showAccounts();
    }else if(tab==='Servers'){
     var locations=E('div',{'class':'ff-server-list'});content.appendChild(E('div',{'class':'ff-actions'},[
@@ -534,7 +607,7 @@ return view.extend({
   root=E('div',{'class':'mk ffvpn','dir':i18n.get()==='fa'?'rtl':'ltr'},[
    E('link',{rel:'stylesheet',href:L.resource('ffvpn/theme.css')}),E('link',{rel:'stylesheet',href:L.resource('ffvpn/app.css')}),
    E('div',{'class':'mk-hero','role':'banner'},[E('div',{'class':'mk-brand'},[E('img',{src:L.resource('ffvpn/logo.png'),alt:'ffvpn','class':'ff-logo'}),E('h2',{},'ffvpn'),E('span',{'class':'mk-version'},state.version||'')]),E('div',{'class':'mk-row mk-hero-controls'},[themes,E('div',{'class':'mk-language-column'},[lang,E('div',{'class':'mk-uptime'},[E('span',{},t('Activity duration')),routerUptime])])])]),
-   E('nav',{'class':'ff-tabs'},['Home','Accounts','Servers','Updates','Logs'].map(function(tab){var b=button(tab,function(){return show(tab);});b.prepend(icon(tab));b.dataset.tab=tab;return b;})),
+   E('nav',{'class':'ff-tabs'},['Home','Accounts','Servers','Settings','Updates','Logs'].map(function(tab){var b=button(tab,function(){return show(tab);});b.prepend(icon(tab));b.dataset.tab=tab;return b;})),
    content=E('main',{}),
    E('footer',{'class':'mk-footer'},[E('img',{src:L.resource('ffvpn/logo.png'),alt:'ffvpn','class':'ff-footer-logo'}),E('span',{},'ffvpn · Copyright © 2026 dreamboxone · GNU AGPLv3'),
     E('a',{'class':'mk-link',href:'https://t.me/routekernel1',target:'_blank',rel:'noopener noreferrer'},'Telegram · t.me/routekernel1'),

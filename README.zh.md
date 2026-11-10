@@ -18,7 +18,7 @@
 - 路由器运行 OpenWrt 23.05、24.10 或 25.12，并采用[受支持的架构](build/architectures.json)。
 - 首次安装需要 SSH、路由器能访问 GitHub，以及一个 Mozilla 账号。安装程序会补装缺少的 LuCI 和依赖。
 - 建议至少留出 32 MB 闪存、64 MB 临时空间，并配备 256 MB 总内存。程序与核心约占 15–20 MB，依赖和路由引擎需要额外资源。
-- 全网路由需要 [Zirgozar](https://github.com/dreamboxone/zirgozar) 或 PassWall2，也可直接使用独立的 SOCKS 代理。
+- LAN 路由可使用独立 TUN、[Zirgozar](https://github.com/dreamboxone/zirgozar) 或 PassWall2。独立 TUN 需要与路由器内核匹配的 `kmod-tun` 以及名为 `lan` 的防火墙区域。
 
 ## 安装
 
@@ -36,9 +36,9 @@ wget -qO /tmp/ffvpn-install.sh https://raw.githubusercontent.com/dreamboxone/ffv
 
 ### 在浏览器中登录
 
-1. 在 Chrome 或 Edge 中通过 HTTPS 打开路由器的本地 LuCI 地址，进入 **账号 → 添加用户**。
-2. 从表单下载并解压 FFVPN 扩展。在 `chrome://extensions` 或 `edge://extensions` 开启开发者模式，选择「加载解压缩的扩展程序」，打开扩展所在文件夹。每个浏览器配置只需安装一次。
-3. 选择「在浏览器中登录 Mozilla」，再在同一个 LuCI 标签页点击 FFVPN 扩展图标。在 Mozilla 官方标签页输入密码并完成验证码或 CAPTCHA 验证。验证期间保留该标签页，完成后回到 LuCI 查看结果。
+1. 在 Chrome 或 Edge 中通过 HTTPS 打开路由器的本地 LuCI 地址，进入 **账户**。
+2. 选择「下载 FFVPN 浏览器扩展」并解压 ZIP。在 `chrome://extensions` 或 `edge://extensions` 开启开发者模式，选择「加载解压缩的扩展程序」，打开扩展所在文件夹。每个浏览器配置只需安装一次。
+3. 在 LuCI 选择「添加用户」和「在浏览器中登录 Mozilla」，再在同一标签页点击 FFVPN 扩展图标。在 Mozilla 官方标签页输入密码并完成验证码或 CAPTCHA 验证。验证期间保留该标签页，完成后回到 LuCI 查看结果。
 
 浏览器需要能访问 Mozilla 登录页面。
 
@@ -50,14 +50,16 @@ wget -qO /tmp/ffvpn-install.sh https://raw.githubusercontent.com/dreamboxone/ffv
 
 - **单个设备或应用。** 打开主开关，在客户端设置 SOCKS5，填写路由器 LAN 地址和端口 `10810`。默认允许 LAN 客户端免用户名和密码连接，WAN 无法访问，管理 API 仅监听回环地址。
 - **全网路由。** 在 **主页 → 基本设置** 选择 [Zirgozar](https://github.com/dreamboxone/zirgozar) 或 PassWall2 并应用设置。通过恢复设置撤销 FFVPN 的路由更改。
+- **独立 TUN。** 在基本设置中选择独立 TUN，可将接口 MTU 设置为 1280–9000 字节，默认 1500。应用设置后 LuCI 显示生效的 MTU。修改它会短暂重启 TUN。该模式处理从 LAN 进入的互联网流量，保留本地路由、DNS 和路由器自身的流量。
 - **连接选项。** 在服务器页选择国家或测量延迟。在基本设置中选择 HTTP/2、HTTP/3 或 HTTP/1.1，以及连接 Mozilla 代理的 IP 版本。默认使用 HTTP/2 和自动优先 IPv4。
 - **TLS 分片和时间。** 基本设置中的 TLS 分片选项旁有帮助说明。「设置路由器时间」会将时区设置为德黑兰并添加伊朗的时间服务器。
 - **中继。** 个人中继和共享中继可独立开关。没有启用个人中继时，共享中继可在 HTTP 451 后处理 Guardian 控制请求。VPN 流量通过 Mozilla 隧道传输。
+- **高级设置。** 在设置页可配置上游 SOCKS5 代理、核心 DNS、分流规则和连接限制，并测试 DNS 和路由。
 
 ## 更新与卸载
 
 - **从 1.0.2 升级到 1.0.3。** 在 SSH 中重新运行安装命令，选择 **2 (Update)**，同时升级界面和核心。也可以在 1.0.2 的 LuCI 中分别点击 **ffvpn** 和**核心**卡片的「更新」。完成后刷新 LuCI。
-- **从 1.0.3 开始。** 在更新页可同时更新应用和核心，也可以分别检查、更新或重新安装。只更新核心时，在**核心**卡片先选「检查」，再选「更新」。两者版本号独立。更新可能会短暂中断连接。
+- **从 1.0.3 开始。** 升级到 1.0.4 时请同时更新应用和核心。在更新页可同时更新应用和核心，也可以分别检查、更新或重新安装。只更新核心时，在**核心**卡片先选「检查」，再选「更新」。两者版本号独立。更新可能会短暂中断连接。
 - LuCI 从 FFVPN 的签名发行版获取兼容 OpenWrt 的核心。FFVPN 发布对应软件包后才能在界面中更新。更新程序下载完整归档并验证签名和 SHA-256。
 - 使用脚本安装时，重新运行命令并选择 **3 (Remove)** 即可卸载。FFVPN 会撤销自己的路由更改，账号数据保留在 `/etc/ffvpn/core`。
 
