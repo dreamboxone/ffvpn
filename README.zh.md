@@ -15,10 +15,10 @@
 
 ## 使用条件
 
-- 路由器运行 OpenWrt 23.05、24.10 或 25.12，并采用[受支持的架构](build/architectures.json)。已在运行 25.12.6 的实体路由器上测试。
+- 路由器运行 OpenWrt 23.05、24.10 或 25.12，并采用[受支持的架构](build/architectures.json)。
 - 首次安装需要 SSH、路由器能访问 GitHub，以及一个 Mozilla 账号。安装程序会补装缺少的 LuCI 和依赖。
 - 建议至少留出 32 MB 闪存、64 MB 临时空间，并配备 256 MB 总内存。程序与核心约占 15–20 MB，依赖和路由引擎需要额外资源。
-- 全网路由需要 Zirgozar 或 PassWall2，也可直接使用独立的 SOCKS 代理。
+- 全网路由需要 [Zirgozar](https://github.com/dreamboxone/zirgozar) 或 PassWall2，也可直接使用独立的 SOCKS 代理。
 
 ## 安装
 
@@ -49,7 +49,7 @@ wget -qO /tmp/ffvpn-install.sh https://raw.githubusercontent.com/dreamboxone/ffv
 ## 连接与路由
 
 - **单个设备或应用。** 打开主开关，在客户端设置 SOCKS5，填写路由器 LAN 地址和端口 `10810`。默认允许 LAN 客户端免用户名和密码连接，WAN 无法访问，管理 API 仅监听回环地址。
-- **全网路由。** 在 **主页 → 基本设置** 选择 Zirgozar 或 PassWall2 并应用设置。通过恢复设置撤销 FFVPN 的路由更改。
+- **全网路由。** 在 **主页 → 基本设置** 选择 [Zirgozar](https://github.com/dreamboxone/zirgozar) 或 PassWall2 并应用设置。通过恢复设置撤销 FFVPN 的路由更改。
 - **连接选项。** 在服务器页选择国家或测量延迟。在基本设置中选择 HTTP/2、HTTP/3 或 HTTP/1.1，以及连接 Mozilla 代理的 IP 版本。默认使用 HTTP/2 和自动优先 IPv4。
 - **TLS 分片和时间。** 基本设置中的 TLS 分片选项旁有帮助说明。「设置路由器时间」会将时区设置为德黑兰并添加伊朗的时间服务器。
 - **中继。** 个人中继和共享中继可独立开关。没有启用个人中继时，共享中继可在 HTTP 451 后处理 Guardian 控制请求。VPN 流量通过 Mozilla 隧道传输。

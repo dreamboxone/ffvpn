@@ -15,10 +15,10 @@ An unofficial client for Firefox's built-in VPN on OpenWrt, with an integrated L
 
 ## Requirements
 
-- OpenWrt 23.05, 24.10 or 25.12 on a [supported architecture](build/architectures.json). OpenWrt 25.12.6 has been tested on router hardware.
+- OpenWrt 23.05, 24.10 or 25.12 on a [supported architecture](build/architectures.json).
 - SSH access for the initial install, access to GitHub from the router and a Mozilla account. The installer adds LuCI and other required dependencies when missing.
 - Recommended free space is 32 MB on flash and 64 MB for temporary files, with at least 256 MB of total RAM. The app and core occupy about 15–20 MB, depending on architecture. Missing dependencies and routing engines need additional resources.
-- Use Zirgozar or PassWall2 for whole-network routing. Clients can also use the standalone SOCKS proxy.
+- Use [Zirgozar](https://github.com/dreamboxone/zirgozar) or PassWall2 for whole-network routing. Clients can also use the standalone SOCKS proxy.
 
 ## Install
 
@@ -49,7 +49,7 @@ Under **Accounts → Account backup**, select **Export backup** to download a ZI
 ## Connect and route traffic
 
 - **Single device or app.** Turn on the main switch and configure SOCKS5 with the router's LAN address and port `10810`. LAN clients can access it without a username or password by default. WAN access is blocked and the management API listens on loopback.
-- **Whole network.** Under **Home → Basic settings**, select Zirgozar or PassWall2 and choose **Apply settings**. Choose **Restore settings** to undo FFVPN's routing changes.
+- **Whole network.** Under **Home → Basic settings**, select [Zirgozar](https://github.com/dreamboxone/zirgozar) or PassWall2 and choose **Apply settings**. Choose **Restore settings** to undo FFVPN's routing changes.
 - **Connection options.** Use **Servers** to pick a country or measure latency. In Basic settings, choose HTTP/2, HTTP/3 or HTTP/1.1, and set the IP preference for connections to Mozilla's proxy. HTTP/2 and automatic IPv4-first selection are the defaults.
 - **TLS fragmentation and clock.** Basic settings includes help beside the TLS fragmentation control. **Set router clock** sets the router's timezone to Tehran and adds Iranian time servers.
 - **Relays.** Personal and shared relay switches are independent. When no personal relay is active, shared relays can handle Guardian control requests after HTTP 451. VPN traffic travels through Mozilla's tunnel.
