@@ -6,7 +6,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 // Exercise the actual LuCI form with responses from the sign-in API.
-const source = fs.readFileSync(path.join(__dirname, '../files/www/luci-static/resources/view/ffvpn/main.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '../files/www/luci-static/resources/view/ffvpn/panel-5820-r1.js'), 'utf8');
 const formSource = source.slice(source.indexOf('  function signinForm(){'), source.indexOf('  function saveSettings(edit){'));
 
 function setup(initial, replies) {

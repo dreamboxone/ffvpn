@@ -225,7 +225,7 @@ if [ -z "$ROOT" ] && [ "$mutated" = 1 ]; then
 	/etc/init.d/ffvpn start
 	if [ "$component" != core ]; then
 		/etc/init.d/rpcd restart
-		rm -f /tmp/luci-indexcache
+		rm -f /tmp/luci-indexcache /tmp/luci-indexcache.*.json
 		/etc/init.d/uhttpd reload
 	fi
 fi

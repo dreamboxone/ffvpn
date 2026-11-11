@@ -56,6 +56,7 @@ Under **Accounts → Account backup**, select **Export backup** to download a ZI
 - **Connection options.** Use **Servers** to pick a country or measure latency. In Basic settings, choose HTTP/2, HTTP/3 or HTTP/1.1, and set the IP preference for connections to Mozilla's proxy. HTTP/2 and automatic IPv4-first selection are the defaults.
 - **TLS fragmentation and clock.** Basic settings includes help beside the TLS fragmentation control. **Set router clock** sets the router's timezone to Tehran and adds Iranian time servers.
 - **Relays.** Personal and shared relay switches are independent. When no personal relay is active, shared relays can handle Guardian control requests after HTTP 451. VPN traffic travels through Mozilla's tunnel.
+- **Advanced settings.** Use **Settings** to configure an upstream SOCKS5 proxy, core DNS, split routing and connection limits. Use **Test DNS** or **Test route** to check your settings.
 
 In connection settings, **Test relay** checks the current relay address and reports DNS and TLS stages. Core 1.0.18 adds fallback TLS routes for relay connection failures while preserving **Require ECH**.
 
@@ -64,7 +65,7 @@ In connection settings, **Test relay** checks the current relay address and repo
 The application version is `5.8.20-r1` (5.8.20, revision 1). Both LuCI and the updater compare revisions, so `r2` is newer than `r1`. To upgrade from an older updater that does not recognize revision suffixes, rerun the installer and choose **Install / Repair**.
 
 - **Upgrade from 1.0.2 to 1.0.3.** Run the installation command again over SSH and choose **2 (Update)** to upgrade both the interface and the core. To upgrade from LuCI 1.0.2, use **Update now** in both the **ffvpn** and **Core** cards. Refresh LuCI after the update.
-- **From 1.0.3 onward.** In **Updates**, you can update both components together, or check, update and reinstall each separately. To update only the core, select **Check for updates** and then **Update now** in the **Core** card. The app and core have independent version numbers. Updating may briefly interrupt the connection.
+- **From 1.0.3 onward.** To upgrade to 1.0.4, update both the app and the core. In **Updates**, you can update both components together, or check, update and reinstall each separately. To update only the core, select **Check for updates** and then **Update now** in the **Core** card. The app and core have independent version numbers. Updating may briefly interrupt the connection.
 - FFVPN publishes OpenWrt-compatible core builds in its own signed releases. A core update becomes available in LuCI when FFVPN publishes the corresponding package. The updater downloads the complete archive and verifies its signature and SHA-256 hashes.
 - To remove a script installation, run the command again and choose **3 (Remove)**. FFVPN restores its routing changes and leaves account data in `/etc/ffvpn/core`.
 

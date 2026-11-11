@@ -3,7 +3,7 @@
 'require rpc';
 'require ui';
 'require poll';
-'require ffvpn.i18n as i18n';
+'require ffvpn.i18n-5820-r1 as i18n';
 'require ffvpn.theme as themeUI';
 'require ffvpn.flags as flags';
 'require ffvpn.logs as logText';
@@ -626,7 +626,7 @@ return view.extend({
   }));
   var mode='auto';try{mode=localStorage.getItem('ffvpn-theme')||'auto';}catch(e){}
   root=E('div',{'class':'mk ffvpn','dir':i18n.get()==='fa'?'rtl':'ltr'},[
-   E('link',{rel:'stylesheet',href:L.resource('ffvpn/theme.css')}),E('link',{rel:'stylesheet',href:L.resource('ffvpn/app.css')}),
+   E('link',{rel:'stylesheet',href:L.resource('ffvpn/theme.css')}),E('link',{rel:'stylesheet',href:L.resource('ffvpn/app-5820-r1.css')}),
    E('div',{'class':'mk-hero','role':'banner'},[E('div',{'class':'mk-brand'},[E('img',{src:L.resource('ffvpn/logo.png'),alt:'ffvpn','class':'ff-logo'}),E('h2',{},'ffvpn'),E('span',{'class':'mk-version'},state.version||'')]),E('div',{'class':'mk-row mk-hero-controls'},[themes,E('div',{'class':'mk-language-column'},[lang,E('div',{'class':'mk-uptime'},[E('span',{},t('Activity duration')),routerUptime])])])]),
    E('nav',{'class':'ff-tabs'},['Home','Accounts','Servers','Settings','Updates','Logs'].map(function(tab){var b=button(tab,function(){return show(tab);});b.prepend(icon(tab));b.dataset.tab=tab;return b;})),
    content=E('main',{}),

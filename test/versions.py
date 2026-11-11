@@ -25,7 +25,7 @@ cases = [
 ]
 invalid = ['5.8.20-r0', '5.8.20-r01', '5.8.20-r', '5.8.20-r-1',
            '5.8.20.1', '5.8.20-r1-extra', 'v5.8.20-r1', '5.8']
-source = (root/'files/www/luci-static/resources/view/ffvpn/main.js').read_text()
+source = (root/'files/www/luci-static/resources/view/ffvpn/panel-5820-r1.js').read_text()
 compare = source[source.index('function compareVersions('):source.index('function note(')]
 subprocess.run(['node', '-e', compare + '''
 const assert = require('node:assert/strict');

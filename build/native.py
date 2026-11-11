@@ -33,7 +33,7 @@ postinst = '''#!/bin/sh
 /etc/init.d/ffvpn enable
 /etc/init.d/ffvpn restart
 /etc/init.d/rpcd restart
-rm -f /tmp/luci-indexcache
+rm -f /tmp/luci-indexcache /tmp/luci-indexcache.*.json
 /etc/init.d/uhttpd reload
 exit 0
 '''
@@ -46,7 +46,7 @@ exit 0
 postrm = '''#!/bin/sh
 [ -z "${IPKG_INSTROOT:-}" ] || exit 0
 /etc/init.d/rpcd restart
-rm -f /tmp/luci-indexcache
+rm -f /tmp/luci-indexcache /tmp/luci-indexcache.*.json
 /etc/init.d/uhttpd reload
 exit 0
 '''

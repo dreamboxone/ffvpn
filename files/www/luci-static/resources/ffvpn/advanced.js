@@ -1,6 +1,6 @@
 'use strict';
 'require baseclass';
-'require ffvpn.i18n as i18n';
+'require ffvpn.i18n-5820-r1 as i18n';
 
 var t=i18n.t;
 

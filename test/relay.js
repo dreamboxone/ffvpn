@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const source = fs.readFileSync(path.join(__dirname, '../files/www/luci-static/resources/view/ffvpn/main.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '../files/www/luci-static/resources/view/ffvpn/panel-5820-r1.js'), 'utf8');
 const optionsSource = source.slice(source.indexOf('  function baseOptions(connection){'), source.indexOf('  function show(tab){'));
 
 async function test() {
