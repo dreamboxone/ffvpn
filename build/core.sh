@@ -23,4 +23,4 @@ version=$(cat CORE_VERSION)
 mkdir -p "$(dirname "$out")"
 out=$(realpath -m "$out")
 cd core
-go build -trimpath -buildvcs=false -ldflags "-s -w -X github.com/armanlife/firefox-vpn-client/core/internal/version.Current=$version" -o "$out" ./cmd/ffvpn
+go build -tags with_gvisor -trimpath -buildvcs=false -ldflags "-s -w -X github.com/armanlife/firefox-vpn-client/core/internal/version.Current=$version" -o "$out" ./cmd/ffvpn

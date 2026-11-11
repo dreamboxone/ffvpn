@@ -27,7 +27,7 @@ jobs:
         run: python3 test/check.py
       - name: Test core behavior
         working-directory: core
-        run: go test ./cmd/ffvpn ./internal/service ./internal/proxy ./internal/accounts ./internal/config ./internal/fxa ./internal/controlplane ./internal/guardian ./internal/resolver ./internal/signinproxy
+        run: go test -tags with_gvisor ./cmd/ffvpn ./internal/service ./internal/proxy ./internal/accounts ./internal/config ./internal/fxa ./internal/controlplane ./internal/guardian ./internal/resolver ./internal/signinproxy ./internal/routertun ./internal/tunstack
   build:
     needs: test
     runs-on: ubuntu-24.04

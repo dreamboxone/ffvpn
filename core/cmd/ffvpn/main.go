@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/armanlife/firefox-vpn-client/core/internal/config"
+	"github.com/armanlife/firefox-vpn-client/core/internal/routertun"
 	"github.com/armanlife/firefox-vpn-client/core/internal/service"
 	"github.com/armanlife/firefox-vpn-client/core/internal/version"
 )
@@ -17,9 +19,29 @@ func main() {
 	dir := flag.String("data-dir", "/etc/ffvpn/core", "Private data directory")
 	show := flag.Bool("version", false, "Print version")
 	off := flag.Bool("off", false, "Start with the proxy disabled")
+	lanTun := flag.String("lan-tun", "", "Run a TUN for traffic entering this LAN interface")
+	tunMTU := flag.Int("tun-mtu", 1500, "LAN TUN interface MTU")
+	tunCleanup := flag.Bool("tun-cleanup", false, "Remove policy routes left by a stopped LAN TUN")
+	tunSupported := flag.Bool("tun-supported", false, "Check if this build supports LAN TUN")
 	flag.Parse()
 	if *show {
 		fmt.Println(version.Current)
+		return
+	}
+	if *tunSupported {
+		if !routertun.Supported {
+			os.Exit(1)
+		}
+		return
+	}
+	if *lanTun != "" || *tunCleanup {
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		err := routertun.Run(ctx, *lanTun, *tunMTU, *tunCleanup)
+		cancel()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 		return
 	}
 	if err := run(*dir, *off); err != nil {
@@ -50,7 +72,6 @@ func run(dir string, off bool) error {
 	cfg.Proxy.Listen = "127.0.0.1:10810"
 	cfg.Proxy.Username, cfg.Proxy.Password = "", ""
 	cfg.SystemProxy.Mode = config.SystemProxyClear
-	cfg.Routing.Enabled = false
 	if err := config.Save(cfgPath, cfg); err != nil {
 		return err
 	}

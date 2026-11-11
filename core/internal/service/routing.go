@@ -218,14 +218,23 @@ func (d *Daemon) runRoutingUpdates() {
 // runs (the list hosts may be filtered) and otherwise, or when that fails,
 // the way the program's own requests go (DNS and API proxy settings).
 func (d *Daemon) updateRoutingLists() error {
-	d.routing.mu.Lock()
-	if d.routing.updating {
-		d.routing.mu.Unlock()
+	if !d.beginRoutingListsUpdate() {
 		return nil
 	}
-	d.routing.updating = true
-	d.routing.mu.Unlock()
+	return d.downloadRoutingLists()
+}
 
+func (d *Daemon) beginRoutingListsUpdate() bool {
+	d.routing.mu.Lock()
+	defer d.routing.mu.Unlock()
+	if d.routing.updating {
+		return false
+	}
+	d.routing.updating = true
+	return true
+}
+
+func (d *Daemon) downloadRoutingLists() error {
 	cfg := d.config().Routing
 	ctx, cancel := context.WithTimeout(context.Background(), listDownloadTimeout)
 	defer cancel()
@@ -254,6 +263,12 @@ func (d *Daemon) updateRoutingLists() error {
 		err = download(&http.Client{Transport: controlplane.Transport(), Timeout: listDownloadTimeout})
 	}
 
+	if err != nil {
+		logx.Warn("downloading the routing lists failed err=%s", logx.Err(err))
+	} else {
+		logx.Info("routing lists downloaded")
+		d.applyRouting(d.config().Routing)
+	}
 	d.routing.mu.Lock()
 	d.routing.updating = false
 	d.routing.lastCheck = time.Now()
@@ -262,13 +277,7 @@ func (d *Daemon) updateRoutingLists() error {
 		d.routing.lastErr = err.Error()
 	}
 	d.routing.mu.Unlock()
-	if err != nil {
-		logx.Warn("downloading the routing lists failed err=%s", logx.Err(err))
-		return err
-	}
-	logx.Info("routing lists downloaded")
-	d.applyRouting(d.config().Routing)
-	return nil
+	return err
 }
 
 func (s *dashboardServer) handleRouting(w http.ResponseWriter, r *http.Request) {
@@ -283,6 +292,15 @@ func (s *dashboardServer) handleRoutingUpdate(w http.ResponseWriter, r *http.Req
 		return
 	}
 	writeJSON(w, http.StatusOK, s.d.routingView())
+}
+
+// LuCI's RPC timeout is shorter than a list download. Start it in the core
+// and let the caller poll GET /api/routing for its result.
+func (s *dashboardServer) handleRoutingUpdateStart(w http.ResponseWriter, r *http.Request) {
+	if s.d.beginRoutingListsUpdate() {
+		go func() { _ = s.d.downloadRoutingLists() }()
+	}
+	writeJSON(w, http.StatusAccepted, map[string]bool{"updating": true})
 }
 
 // destinationTest is POST /api/routing/test: where a destination goes.

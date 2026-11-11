@@ -3,7 +3,7 @@
 reply_error() { json_init; json_add_string error "$1"; json_dump; }
 case "$1" in
 	list)
-		printf '%s\n' '{"status":{},"usage":{},"logs":{},"logs_clear":{"component":""},"connection_check":{"site":""},"integration":{"enabled":true,"target":"","confirmed":true},"api":{"path":""},"api_write":{"method":"","path":"","body":""},"power":{"enabled":true,"confirmed":true},"mode":{"value":""},"directory":{"value":""},"clock":{"now":0},"update":{"component":"","action":""},"update_status":{}}'
+		printf '%s\n' '{"status":{},"usage":{},"logs":{},"logs_clear":{"component":""},"connection_check":{"site":""},"integration":{"enabled":true,"target":"","confirmed":true},"api":{"path":""},"api_write":{"method":"","path":"","body":""},"power":{"enabled":true,"confirmed":true},"mode":{"value":""},"tun_mtu":{"value":0},"directory":{"value":""},"clock":{"now":0},"update":{"component":"","action":""},"update_status":{}}'
 		;;
 	call)
 		read -r input
@@ -29,6 +29,10 @@ case "$1" in
 				json_add_boolean enabled "$(uci -q get ffvpn.main.enabled || echo 0)"
 				json_add_string integration "$(uci -q get ffvpn.main.integration || echo auto)"
 				json_add_string target "$(cat /etc/ffvpn/network-state/target 2>/dev/null)"
+				json_add_string tun_mtu "$(uci -q get ffvpn.main.tun_mtu || echo 1500)"
+				tun_active_mtu=''
+				if [ -s /var/run/ffvpn-lan-tun.ready ]; then tun_active_mtu=$(cat /sys/class/net/ffvpntun/mtu 2>/dev/null); fi
+				json_add_string tun_active_mtu "$tun_active_mtu"
 				json_add_string version "$(cat /usr/share/ffvpn/version 2>/dev/null)"
 				busy=0; [ ! -d /var/lock/ffvpn-control ] || busy=1
 				json_add_boolean busy "$busy"
@@ -93,6 +97,10 @@ case "$1" in
 				;;
 			api|api_write)
 				json_get_var path path
+				if [ "$2:$path" = api:/settings ]; then
+					reply_error 'Settings require FFVPN write access.'
+					exit 0
+				fi
 				method=GET body='{}'
 				if [ "$2" = api_write ]; then json_get_var method method; json_get_var body body; fi
 				# GET and write methods have separate ubus ACL permissions.
@@ -105,8 +113,11 @@ case "$1" in
                 [ ! -d /var/lock/ffvpn-control ] || { reply_error 'Another ffvpn operation is in progress.'; exit 0; }
                 if [ "$enabled" = 1 ]; then
                     [ "$confirmed" = 1 ] || { reply_error 'Confirm the routing changes first.'; exit 0; }
-                    case "$target" in zirgozar|passwall2) ;; *) reply_error 'Choose Zirgozar or PassWall2.'; exit 0;; esac
-                    [ -x "/etc/init.d/$target" ] || { reply_error 'The selected routing engine is not installed.'; exit 0; }
+                    case "$target" in
+                        tun) ;;
+                        zirgozar|passwall2) [ -x "/etc/init.d/$target" ] || { reply_error 'The selected routing engine is not installed.'; exit 0; };;
+                        *) reply_error 'Choose a routing mode.'; exit 0;;
+                    esac
                     /usr/libexec/ffvpn/control integrate "$target" </dev/null >/tmp/ffvpn-control.log 2>&1 &
                 else
                     /usr/libexec/ffvpn/control restore </dev/null >/tmp/ffvpn-control.log 2>&1 &
@@ -125,6 +136,10 @@ case "$1" in
 			mode)
 				json_get_var value value
 				if result=$(/usr/libexec/ffvpn/control mode "$value" 2>&1); then echo '{"ok":true}'; else reply_error "$result"; fi
+				;;
+			tun_mtu)
+				json_get_var value value
+				if result=$(/usr/libexec/ffvpn/control tun_mtu "$value" 2>&1); then echo '{"ok":true}'; else reply_error "$result"; fi
 				;;
 			directory)
 				json_get_var value value

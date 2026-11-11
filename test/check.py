@@ -3,6 +3,7 @@
 import json
 import pathlib
 import subprocess
+import sys
 
 root = pathlib.Path(__file__).resolve().parents[1]
 subprocess.run(['python3',str(root/'build/assets.py')],check=True)
@@ -20,7 +21,11 @@ for script in manifest['content_scripts']:
         assert (extension/name).is_file()
 for path in extension.glob('*.js'):
     subprocess.run(['node', '--check', str(path)], check=True)
+for name in ('signin.js', 'relay.js'):
+    subprocess.run(['node', str(root/'test'/name)], check=True)
+subprocess.run([sys.executable, str(root/'test/versions.py')], check=True)
 assert (root/'CORE_VERSION').read_text().strip() == (root/'files/usr/share/ffvpn/core-version').read_text().strip()
+assert (root/'VERSION').read_text().strip() == (root/'files/usr/share/ffvpn/version').read_text().strip()
 for lang in ('en','zh','ru'):
     assert (root/f'README.{lang}.md').is_file()
 subprocess.run(['shellcheck', '-S', 'error', str(root/'install.sh'), *map(str,(root/'files/usr/libexec/ffvpn').glob('*')),str(root/'files/usr/libexec/rpcd/luci.ffvpn')],check=True)

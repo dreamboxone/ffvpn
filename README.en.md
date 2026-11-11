@@ -18,7 +18,7 @@ An unofficial client for Firefox's built-in VPN on OpenWrt, with an integrated L
 - OpenWrt 23.05, 24.10 or 25.12 on a [supported architecture](build/architectures.json).
 - SSH access for the initial install, access to GitHub from the router and a Mozilla account. The installer adds LuCI and other required dependencies when missing.
 - Recommended free space is 32 MB on flash and 64 MB for temporary files, with at least 256 MB of total RAM. The app and core occupy about 15–20 MB, depending on architecture. Missing dependencies and routing engines need additional resources.
-- Use [Zirgozar](https://github.com/dreamboxone/zirgozar) or PassWall2 for whole-network routing. Clients can also use the standalone SOCKS proxy.
+- Use standalone TUN, [Zirgozar](https://github.com/dreamboxone/zirgozar) or PassWall2 for LAN routing. TUN needs a `kmod-tun` package matching the router's kernel and a firewall zone named `lan`.
 
 ## Install
 
@@ -34,11 +34,13 @@ Choose **1 (Install / Repair)**. The installer detects the router architecture, 
 
 Open **Accounts → Add user**, enter your Mozilla email and password, and complete any verification prompts. You can add multiple accounts, reorder their priority, refresh quotas and temporarily disable accounts. FFVPN can switch accounts automatically as quota runs low.
 
+Direct sign-in displays any CAPTCHA in the form. Enter the pictured characters in the answer field and select **Continue**. A repeated challenge displays its new image.
+
 ### Sign in with your browser
 
-1. Open the router's local LuCI address over HTTPS in Chrome or Edge, then select **Accounts → Add user**.
-2. Download and extract the FFVPN extension from the form. Enable Developer mode at `chrome://extensions` or `edge://extensions`, then select the extracted folder with **Load unpacked**. Install the extension once per browser profile.
-3. Choose **Sign in with Mozilla in your browser**, then click the extension icon in the same LuCI tab. Enter the password and complete any codes or CAPTCHA in Mozilla's tab. Leave that tab open through verification, then check LuCI for the result.
+1. Open the router's local LuCI address over HTTPS in Chrome or Edge and select **Accounts**.
+2. Select **Download the FFVPN browser extension** and extract the ZIP. Enable Developer mode at `chrome://extensions` or `edge://extensions`, then select the extracted folder with **Load unpacked**. Install the extension once per browser profile.
+3. In LuCI, choose **Add user → Sign in with Mozilla in your browser**, then click the extension icon in the same tab. Enter the password and complete any codes or CAPTCHA in Mozilla's tab. Leave that tab open through verification, then check LuCI for the result.
 
 The browser needs access to Mozilla's sign-in page for this method.
 
@@ -50,11 +52,16 @@ Under **Accounts → Account backup**, select **Export backup** to download a ZI
 
 - **Single device or app.** Turn on the main switch and configure SOCKS5 with the router's LAN address and port `10810`. LAN clients can access it without a username or password by default. WAN access is blocked and the management API listens on loopback.
 - **Whole network.** Under **Home → Basic settings**, select [Zirgozar](https://github.com/dreamboxone/zirgozar) or PassWall2 and choose **Apply settings**. Choose **Restore settings** to undo FFVPN's routing changes.
+- **Standalone TUN.** In Basic settings select **Standalone TUN**. Set **TUN interface MTU** to 1280–9000 bytes and select **Apply TUN MTU**. The default is 1500. After **Apply settings**, LuCI shows the active interface MTU. Changing it briefly restarts an active TUN. This mode handles incoming LAN internet traffic and preserves local routes, local DNS and router-originated traffic.
 - **Connection options.** Use **Servers** to pick a country or measure latency. In Basic settings, choose HTTP/2, HTTP/3 or HTTP/1.1, and set the IP preference for connections to Mozilla's proxy. HTTP/2 and automatic IPv4-first selection are the defaults.
 - **TLS fragmentation and clock.** Basic settings includes help beside the TLS fragmentation control. **Set router clock** sets the router's timezone to Tehran and adds Iranian time servers.
 - **Relays.** Personal and shared relay switches are independent. When no personal relay is active, shared relays can handle Guardian control requests after HTTP 451. VPN traffic travels through Mozilla's tunnel.
 
+In connection settings, **Test relay** checks the current relay address and reports DNS and TLS stages. Core 1.0.18 adds fallback TLS routes for relay connection failures while preserving **Require ECH**.
+
 ## Update or remove
+
+The application version is `5.8.20-r1` (5.8.20, revision 1). Both LuCI and the updater compare revisions, so `r2` is newer than `r1`. To upgrade from an older updater that does not recognize revision suffixes, rerun the installer and choose **Install / Repair**.
 
 - **Upgrade from 1.0.2 to 1.0.3.** Run the installation command again over SSH and choose **2 (Update)** to upgrade both the interface and the core. To upgrade from LuCI 1.0.2, use **Update now** in both the **ffvpn** and **Core** cards. Refresh LuCI after the update.
 - **From 1.0.3 onward.** In **Updates**, you can update both components together, or check, update and reinstall each separately. To update only the core, select **Check for updates** and then **Update now** in the **Core** card. The app and core have independent version numbers. Updating may briefly interrupt the connection.

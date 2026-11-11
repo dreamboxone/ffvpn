@@ -7,6 +7,7 @@ import io
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import tarfile
@@ -20,6 +21,12 @@ a = p.parse_args()
 # process's private-key umask. The signing key is outside this staging tree.
 os.umask(0o022)
 version = pathlib.Path('VERSION').read_text().strip()
+match = re.fullmatch(r'(\d+\.\d+\.\d+)(?:-r([1-9]\d*))?', version)
+if not match:
+    raise ValueError('Invalid application version: ' + version)
+package_base, revision = match.group(1), match.group(2) or '1'
+ipk_version = package_base + '-' + revision
+apk_version = package_base + '-r' + revision
 dependencies = ['curl', 'usign', 'luci-base', 'rpcd', 'jsonfilter', 'nftables']
 postinst = '''#!/bin/sh
 [ -z "${IPKG_INSTROOT:-}" ] || exit 0
@@ -96,7 +103,7 @@ for arch in json.loads(pathlib.Path('build/architectures.json').read_text()):
         control.mkdir()
         size = sum(f.stat().st_size for f in root.rglob('*') if f.is_file())
         (control / 'control').write_text(
-            f'Package: ffvpn\nVersion: {version}-1\nArchitecture: {arch}\n'
+            f'Package: ffvpn\nVersion: {ipk_version}\nArchitecture: {arch}\n'
             f'Depends: {", ".join(dependencies)}\nInstalled-Size: {size}\n'
             'Section: net\nLicense: AGPL-3.0-or-later AND GPL-3.0-only\n'
             'Maintainer: dreamboxone\nURL: https://github.com/dreamboxone/ffvpn\n'
@@ -105,7 +112,7 @@ for arch in json.loads(pathlib.Path('build/architectures.json').read_text()):
         for name, script in [('postinst', postinst), ('prerm', prerm), ('postrm', postrm)]:
             (control / name).write_text(script)
             (control / name).chmod(0o755)
-        ipk = a.assets / f'ffvpn_{version}-1_{arch}.ipk'
+        ipk = a.assets / f'ffvpn_{ipk_version}_{arch}.ipk'
         package_stream = io.BytesIO()
         with tarfile.open(fileobj=package_stream, mode='w') as tar:
             for name, content in [('debian-binary', b'2.0\n'),
@@ -125,8 +132,8 @@ for arch in json.loads(pathlib.Path('build/architectures.json').read_text()):
         (apkmeta / 'ffvpn.list').write_text('\n'.join(names) + '\n')
         for path in root.rglob('*'):
             os.utime(path, (0, 0))
-        apk = a.assets / f'ffvpn-{version}-r1-{arch}.apk'
-        command = [a.apk, 'mkpkg', '--info', 'name:ffvpn', '--info', f'version:{version}-r1',
+        apk = a.assets / f'ffvpn-{apk_version}-{arch}.apk'
+        command = [a.apk, 'mkpkg', '--info', 'name:ffvpn', '--info', f'version:{apk_version}',
                    '--info', f'arch:{arch}', '--info', 'description:Firefox VPN with integrated LuCI',
                    '--info', 'license:AGPL-3.0-or-later AND GPL-3.0-only',
                    '--info', 'url:https://github.com/dreamboxone/ffvpn',

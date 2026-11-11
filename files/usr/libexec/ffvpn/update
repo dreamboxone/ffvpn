@@ -73,6 +73,24 @@ safe_path() {
 	return 1
 }
 verify() { printf '%s  %s\n' "$1" "$2" | sha256sum -c - >/dev/null 2>&1; }
+is_release_version() {
+	printf '%s\n' "$1" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-r[1-9][0-9]*)?$'
+}
+refuse_downgrade() {
+	installed=$(cat "$ROOT/usr/share/ffvpn/$1" 2>/dev/null || true)
+	is_release_version "$installed" || return 0
+	if awk -v installed="$installed" -v candidate="$2" 'BEGIN {
+		gsub(/-r/, ".", installed); gsub(/-r/, ".", candidate);
+		split(installed, a, "."); split(candidate, b, ".");
+		for (i = 1; i <= 4; i++) {
+			if (a[i]+0 != b[i]+0) exit !(a[i]+0 > b[i]+0);
+		}
+		exit 1;
+	}'; then
+		printf 'The installed %s (%s) is newer than the published version (%s). Downgrade refused.\n' "$1" "$installed" "$2" >&2
+		return 1
+	fi
+}
 finish_file() {
 	[ -n "${path:-}" ] || return 0
 	[ "$(wc -c < "$WORK/new/$path" | tr -d ' ')" = "$size" ]
@@ -100,7 +118,7 @@ usign -V -p "$KEY" -m "$WORK/manifest" -x "$WORK/manifest.sig"
 read -r magic schema app_version manifest_arch core_version < "$WORK/manifest"
 [ "$magic" = FFVPN ] && [ "$schema" = 2 ] && [ "$manifest_arch" = "$arch" ]
 for v in "$app_version" "$core_version"; do
-	case "$v" in ''|*[!0-9a-zA-Z._-]*) exit 1;; esac
+	is_release_version "$v" || { echo 'Invalid signed release version.' >&2; exit 1; }
 done
 version=$app_version; [ "$component" != core ] || version=$core_version
 printf '%s\n' "$app_version" > /tmp/ffvpn-update-app.latest
@@ -108,6 +126,8 @@ printf '%s\n' "$core_version" > /tmp/ffvpn-update-core.latest
 if [ "$action" = check ]; then
 	echo "$version"; success=1; exit 0
 fi
+if [ "$component" != core ]; then refuse_downgrade version "$app_version"; fi
+if [ "$component" != app ]; then refuse_downgrade core-version "$core_version"; fi
 archive_record=$(sed -n '2p' "$WORK/manifest")
 read -r record archive_hash archive_size archive_name <<EOF
 $archive_record
